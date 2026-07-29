@@ -382,7 +382,7 @@ function normalize(raw){
       dp: cl(r['Data da Última Paralisação']), dr: cl(r['Data de reinício da Última Paralisação']),
       mo: cl(r['Motivo da Paralisação']), cj, c
     };
-  });
+  }).map(r => { r.dp = brDate(r.dp); r.dr = brDate(r.dr); return r; });
 }
 
 async function load(){
@@ -412,7 +412,11 @@ async function load(){
 const isProblem = r => ['Cancelado','Sem Evolução','Paralisado Com Termo'].includes(r.s);
 const isOngoing = r => ['Em desenvolvimento','Em aberto'].includes(r.s);
 const isDone    = r => r.s === 'Concluído';
-const hasOpenStop = r => r.dp && !r.dr && !isDone(r) && r.s !== 'Cancelado';
+/* paralisada sem reinício = status oficial "Paralisado Com Termo"
+   OU data de paralisação sem reinício válido numa obra ativa
+   (só conta como reinício uma data de verdade — "-" não vale) */
+const hasOpenStop = r => r.s === 'Paralisado Com Termo' ||
+  (!!r.dp && !parseDate(r.dr) && !isDone(r) && r.s !== 'Cancelado');
 const payGap = r => (r.vt > 0 && r.p != null) ? (r.vp/r.vt - r.p/100) : 0;
 
 const MOTIVO_CATS = [
@@ -428,8 +432,22 @@ function motivoCat(mo){
   return 'Outros / não detalhado';
 }
 function parseDate(s){
-  const m = s && s.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-  return m ? new Date(+m[3], +m[2]-1, +m[1]) : null;
+  if (!s) return null;
+  s = String(s);
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);          // dd/mm/aaaa
+  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);                    // ISO (Apps Script)
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  return null;
+}
+/* exibe qualquer data reconhecida como dd/mm/aaaa;
+   "-", "–" ou vazio significam "não tem data" e viram '' */
+function brDate(s){
+  if (!s || /^[\s\-–—]*$/.test(String(s))) return '';
+  const d = parseDate(s);
+  if (!d) return String(s).trim();
+  return String(d.getDate()).padStart(2,'0') + '/' +
+         String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
 }
 
 /* ============================================================
@@ -479,7 +497,7 @@ function predict(r){
   if (t != null){ const d = 0.7*(logit(t)-logit(g)); z += d; push('tipologia', d); }
   const o = MODEL.ro.get(r.o);
   if (o != null){ const d = 0.7*(logit(o)-logit(g)); z += d; push('órgão', d); }
-  if (hasOpenStop(r)){ z += 1.3; factors.push({label:'paralisada sem reinício', delta:1.3}); }
+  if (r.dp && !parseDate(r.dr)){ z += 1.3; factors.push({label:'paralisada sem reinício', delta:1.3}); }
   if (payGap(r) > 0.25){ z += 0.6; factors.push({label:'pagto > execução', delta:0.6}); }
   factors.sort((a,b) => Math.abs(b.delta)-Math.abs(a.delta));
   return { p: sigm(z), factors };
@@ -748,7 +766,7 @@ function showContr(key){
     <div style="overflow-x:auto"><table>
       <thead><tr><th>ID</th><th>Ação</th><th>Órgão</th><th>Status</th><th>Exec.</th><th>Valor</th></tr></thead>
       <tbody>${rows.map(r=>`<tr>
-        <td class="num">${esc(r.id)}</td><td>${esc(r.n)}${r.dp&&!r.dr?' <span class="tag t-par">paralisada</span>':''}</td>
+        <td class="num">${esc(r.id)}</td><td>${esc(r.n)}${hasOpenStop(r)&&r.s!=='Paralisado Com Termo'?' <span class="tag t-par">paralisada</span>':''}</td>
         <td>${esc(r.o)}</td><td>${statusTag(r.s)}</td>
         <td class="num">${r.p==null?'—':r.p.toFixed(0)+'%'}</td><td class="num">${r.vt?fmtBRL(r.vt):'—'}</td>
       </tr>`).join('')}</tbody>
@@ -815,14 +833,16 @@ function buildPar(){
   bars(document.getElementById('motivo-bars'),
     Object.entries(cats).map(([l,v])=>({l,v})).sort((a,b)=>b.v-a.v), 'w');
 
-  const open = DATA.filter(hasOpenStop).sort((a,b)=>b.vt-a.vt).slice(0,25);
+  const allOpen = DATA.filter(hasOpenStop);
+  const open = [...allOpen].sort((a,b)=>b.vt-a.vt).slice(0,25);
+  const vOpen = allOpen.reduce((a,r)=>a+r.vt,0);
   document.getElementById('par-open').innerHTML = `
-    <div class="sub"><b>${fmtN(DATA.filter(hasOpenStop).length)}</b> obras nessa situação — mostrando as 25 de maior valor</div>
+    <div class="sub"><b>${fmtN(allOpen.length)}</b> obras nessa situação (${fmtBRL(vOpen)} contratados) — inclui todas com status "Paralisado Com Termo" e as ativas com paralisação sem data de reinício. Mostrando as 25 de maior valor.</div>
     <div style="overflow-x:auto"><table>
-      <thead><tr><th>Ação</th><th>Órgão</th><th>Parou em</th><th>Valor</th></tr></thead>
+      <thead><tr><th>Ação</th><th>Órgão</th><th>Status</th><th>Parou em</th><th>Valor</th></tr></thead>
       <tbody>${open.map(r=>`<tr>
         <td>${esc(r.n)}<div style="font:400 .68rem var(--mono);color:var(--ink-2)">${esc(r.m)||''}${r.c?' · '+esc(r.c):''}</div></td>
-        <td>${esc(r.o)}</td><td class="num">${esc(r.dp)}</td><td class="num">${r.vt?fmtBRL(r.vt):'—'}</td></tr>`).join('')}</tbody>
+        <td>${esc(r.o)}</td><td>${statusTag(r.s)}</td><td class="num">${esc(r.dp)||'—'}</td><td class="num">${r.vt?fmtBRL(r.vt):'—'}</td></tr>`).join('')}</tbody>
     </table></div>`;
 }
 
