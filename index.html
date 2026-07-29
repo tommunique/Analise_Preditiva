@@ -131,6 +131,30 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
 
 .note{font-size:.75rem;color:var(--ink-2);border-left:3px solid var(--warn);padding:6px 10px;background:#FBF6EC;border-radius:0 4px 4px 0;margin-top:12px}
 .opp{border-left:3px solid var(--ok);background:#F0F7F1}
+
+/* filtro por ano de celebração */
+#yearbar{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.yb-lbl{font:600 .74rem 'Barlow Semi Condensed';text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2);white-space:nowrap}
+#year-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ychip{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:14px;padding:4px 12px;font:600 .78rem 'IBM Plex Sans';cursor:pointer;white-space:nowrap}
+.ychip small{font:400 .68rem var(--mono);color:var(--ink-2);margin-left:4px}
+.ychip:hover{border-color:var(--steel)}
+.ychip.on{background:var(--steel);border-color:var(--steel);color:#fff}
+.ychip.on small{color:#C9DAE6}
+.ychip.clear{background:none;border:none;color:var(--steel);text-decoration:underline;padding:4px 6px}
+.yb-scope{font:500 .7rem var(--mono);color:var(--ink-2);margin-left:auto}
+
+/* empresas problemáticas */
+.ep{display:grid;grid-template-columns:1fr auto auto;gap:14px;align-items:center;padding:11px 8px;border-bottom:1px solid var(--line);cursor:pointer}
+.ep:hover{background:var(--risk-soft)}
+.ep:focus-visible{outline:2px solid var(--risk)}
+.ep .who b{display:block;font-size:.9rem;font-weight:600}
+.ep .who small{font:400 .7rem var(--mono);color:var(--ink-2)}
+.ep .frase{font:600 .85rem 'IBM Plex Sans';color:var(--risk);background:var(--risk-soft);border:1px solid #E5C3BE;border-radius:12px;padding:4px 12px;white-space:nowrap}
+.ep .expo{text-align:right;font-size:.78rem;min-width:150px}
+.ep .expo b{display:block;font:700 .95rem 'Barlow Semi Condensed';color:var(--risk)}
+.ep .expo.zero b{color:var(--ink-2)}
+@media(max-width:760px){.ep{grid-template-columns:1fr;gap:6px}.ep .expo{text-align:left;min-width:0}}
 @media(max-width:700px){
   .stake{grid-template-columns:26px 1fr 90px 48px}
   .bar-row{grid-template-columns:120px 1fr 66px}
@@ -164,15 +188,20 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
     <div id="loadmsg">carregando dados…</div>
   </div>
 
+  <div id="yearbar" style="display:none">
+    <span class="yb-lbl">Ano de celebração:</span>
+    <div id="year-chips"></div>
+  </div>
+
   <!-- ============ VISÃO GERAL ============ -->
   <section class="screen" id="s-geral">
     <div class="kpis" id="kpis"></div>
     <div class="grid2">
       <div class="card">
         <h2>Situação da carteira</h2>
-        <div class="sub">Distribuição das ações por status</div>
+        <div class="sub">Distribuição das obras por status</div>
         <div class="donut-wrap">
-          <svg id="donut" width="150" height="150" viewBox="0 0 42 42" role="img" aria-label="Distribuição por status"></svg>
+          <svg id="donut" width="150" height="150" viewBox="0 0 42 42" role="img" aria-label="Distribuição das obras por status"></svg>
           <div class="legend" id="donut-leg"></div>
         </div>
       </div>
@@ -183,12 +212,12 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
       </div>
       <div class="card">
         <h2>Onde os problemas se concentram — órgãos</h2>
-        <div class="sub">% das ações de cada órgão que terminaram canceladas, sem evolução ou paralisadas (mín. 30 ações)</div>
+        <div class="sub">% das obras de cada órgão que terminaram canceladas, sem evolução ou paralisadas (mín. 30 ações)</div>
         <div id="orgao-bars"></div>
       </div>
       <div class="card">
         <h2>Onde os problemas se concentram — tipologias</h2>
-        <div class="sub">% de ações com problema por tipo de obra (mín. 30 ações)</div>
+        <div class="sub">% de obras com problema por tipo (mín. 30 ações)</div>
         <div id="tipo-bars"></div>
       </div>
     </div>
@@ -227,7 +256,7 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
 
     <div class="card">
       <h2>Por que confiar nesses alertas</h2>
-      <div class="sub">Cada sinal foi testado contra as <b id="ev-n"></b> ações já encerradas da sua própria planilha: a barra mostra quantas das obras com aquele sinal terminaram mal. A linha preta é a média geral (<b id="ev-base"></b>) — barra à direita dela = sinal de perigo real.</div>
+      <div class="sub">Cada sinal foi testado contra as <b id="ev-n"></b> obras já encerradas da sua própria planilha: a barra mostra quantas das obras com aquele sinal terminaram mal. A linha preta é a média geral (<b id="ev-base"></b>) — barra à direita dela = sinal de perigo real.</div>
       <div id="ev-bars"></div>
     </div>
   </section>
@@ -288,6 +317,11 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
 
   <!-- ============ CONTRATADAS ============ -->
   <section class="screen" id="s-contratadas">
+    <div class="card" id="ep-card" style="border-top:3px solid var(--risk)">
+      <h2>🏢 Empresas problemáticas</h2>
+      <div class="sub" id="ep-sub"></div>
+      <div id="ep-rows"></div>
+    </div>
     <div id="c-list" class="card">
       <h2>Ranking de risco das contratadas</h2>
       <div class="sub">Empresas com 5+ contratos, ordenadas pelo índice de risco (0–100). A faixa mostra a carteira: <span style="color:var(--ok)">■ concluída</span> · <span style="color:var(--steel)">■ em andamento</span> · <span style="color:var(--warn)">▨ paralisada/sem evolução</span> · <span style="color:var(--risk)">■ cancelada</span></div>
@@ -311,7 +345,7 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
   <!-- ============ OBRAS ============ -->
   <section class="screen" id="s-obras">
     <div class="card">
-      <h2>Todas as ações</h2>
+      <h2>Todas as obras</h2>
       <div class="sub" id="o-count"></div>
       <div class="filters">
         <input id="o-search" type="search" placeholder="Buscar por nome, município, contratada…">
@@ -353,7 +387,9 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
    ============================================================ */
 const LS_KEY = 'obras_api_url';
 const HOJE = new Date();
+let RAW = [];                       // todas as obras do escopo (sem filtro de ano)
 let DATA = [], CONTR = [], ALERTAS = [], EVID = null;
+const YEAR_SEL = new Set();         // anos marcados; vazio = todos
 
 const fmtBRL = v => v >= 1e9 ? 'R$ '+(v/1e9).toFixed(2)+' bi'
               : v >= 1e6 ? 'R$ '+(v/1e6).toFixed(1)+' mi'
@@ -407,13 +443,17 @@ function normalize(raw){
     return {
       id: cl(r['ID da Ação']), n: cl(r['Nome da Ação']), o: cl(r['Órgão da Ação']),
       s: cl(r['Status']), p: pctv(r['Percentual de Execução da Ação']),
-      t: cl(r['TIPOLOGIA']), m: cl(r['Localização (Município)']),
+      t: cl(r['TIPOLOGIA']), cl: cl(r['CLASSIFICAÇÃO']), m: cl(r['Localização (Município)']),
       dc: cl(r['Data da celebração']),
       vt: money(r['Valor Total']), vp: money(r['Valor pago total']),
       dp: cl(r['Data da Última Paralisação']), dr: cl(r['Data de reinício da Última Paralisação']),
       mo: cl(r['Motivo da Paralisação']), cj, c
     };
-  }).map(r => { r.dp = brDate(r.dp); r.dr = brDate(r.dr); r.dc = brDate(r.dc); return r; });
+  }).map(r => { r.dp = brDate(r.dp); r.dr = brDate(r.dr); r.dc = brDate(r.dc); return r; })
+  /* escopo da análise: somente CLASSIFICAÇÃO = OBRA e sem
+     referência a convênio no nome da ação (CONVÊNIO, CONV) */
+    .filter(r => (!r.cl || r.cl.toUpperCase() === 'OBRA') &&
+                 !/CONV[EÊ]NIO|\bCONV\b/i.test(r.n));
 }
 
 async function load(){
@@ -424,17 +464,75 @@ async function load(){
     const res = await fetch(src);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const json = await res.json();
-    DATA = normalize(Array.isArray(json) ? json : (json.rows || json.data || []));
-    if (!DATA.length) throw new Error('resposta vazia');
-    document.getElementById('src-badge').textContent =
-      (url ? 'fonte: apps script' : 'fonte: data.json') + ' · ' + fmtN(DATA.length) + ' registros';
-    buildAll();
+    RAW = normalize(Array.isArray(json) ? json : (json.rows || json.data || []));
+    if (!RAW.length) throw new Error('resposta vazia');
+    buildYearBar();
+    applyYearFilter();
     document.getElementById('loading').style.display = 'none';
+    document.getElementById('yearbar').style.display = 'flex';
     show(location.hash.replace('#','') || 'geral');
   }catch(e){
     document.getElementById('loadmsg').innerHTML =
       'Não consegui carregar os dados (' + esc(e.message) + ').<br>Verifique a URL da API na aba ⚙ Config.';
   }
+}
+
+/* ============================================================
+   FILTRO POR ANO DE CELEBRAÇÃO
+   Chips marcáveis; vazio = todos os anos. Recalcula TODA a
+   análise (alertas, empresas, paralisações) só com as obras
+   celebradas nos anos marcados.
+   ============================================================ */
+const celYear = r => { const d = parseDate(r.dc); return d ? d.getFullYear() : null; };
+
+function buildYearBar(){
+  const counts = new Map();
+  let semData = 0;
+  for (const r of RAW){
+    const y = celYear(r);
+    if (y == null) semData++;
+    else counts.set(y, (counts.get(y)||0)+1);
+  }
+  const years = [...counts.keys()].sort((a,b)=>b-a);
+  const el = document.getElementById('year-chips');
+  el.innerHTML =
+    years.map(y => `<button class="ychip" data-y="${y}">${y}<small>${fmtN(counts.get(y))}</small></button>`).join('') +
+    (semData ? `<button class="ychip" data-y="sem">Sem data<small>${fmtN(semData)}</small></button>` : '') +
+    `<button class="ychip clear" data-y="__clear" style="display:none">limpar</button>` +
+    `<span class="yb-scope" id="yb-scope"></span>`;
+  el.addEventListener('click', e => {
+    const b = e.target.closest('.ychip'); if (!b) return;
+    const y = b.dataset.y;
+    if (y === '__clear') YEAR_SEL.clear();
+    else {
+      const key = y === 'sem' ? 'sem' : +y;
+      YEAR_SEL.has(key) ? YEAR_SEL.delete(key) : YEAR_SEL.add(key);
+    }
+    applyYearFilter();
+  });
+}
+
+function applyYearFilter(){
+  DATA = YEAR_SEL.size
+    ? RAW.filter(r => {
+        const y = celYear(r);
+        return y == null ? YEAR_SEL.has('sem') : YEAR_SEL.has(y);
+      })
+    : RAW;
+  // estado visual dos chips
+  document.querySelectorAll('.ychip').forEach(b => {
+    if (b.dataset.y === '__clear'){ b.style.display = YEAR_SEL.size ? '' : 'none'; return; }
+    const key = b.dataset.y === 'sem' ? 'sem' : +b.dataset.y;
+    b.classList.toggle('on', YEAR_SEL.has(key));
+  });
+  const sc = document.getElementById('yb-scope');
+  if (sc) sc.textContent = YEAR_SEL.size
+    ? fmtN(DATA.length) + ' de ' + fmtN(RAW.length) + ' obras no recorte'
+    : 'todos os anos · ' + fmtN(RAW.length) + ' obras';
+  document.getElementById('src-badge').textContent =
+    (localStorage.getItem(LS_KEY) ? 'fonte: apps script' : 'fonte: data.json') +
+    ' · ' + fmtN(DATA.length) + ' obras (sem convênios)';
+  buildAll();
 }
 
 /* ============================================================
@@ -466,9 +564,11 @@ function motivoCat(mo){
    ============================================================ */
 const EMP = { base: 0.2, map: new Map() };
 function buildEmpHistory(){
-  const fin = DATA.filter(r => isDone(r) || isProblem(r));
+  /* histórico completo (RAW): a reputação da empresa não depende
+     do filtro de ano — ele define quais obras analisar, não o passado */
+  const fin = RAW.filter(r => isDone(r) || isProblem(r));
   EMP.fin = fin;
-  EMP.base = fin.filter(isProblem).length / fin.length;
+  EMP.base = fin.length ? fin.filter(isProblem).length / fin.length : 0.2;
   EMP.map.clear();
   for (const r of fin){
     const k = r.cj || r.c; if (!k) continue;
@@ -617,7 +717,7 @@ function donut(el, legEl, parts){
     off -= frac;
   }
   el.innerHTML = svg + `<text x="21" y="20" text-anchor="middle" font-size="6.5" font-weight="700" font-family="Barlow Semi Condensed">${fmtN(total)}</text>
-    <text x="21" y="26.5" text-anchor="middle" font-size="3" fill="#5A6572">ações</text>`;
+    <text x="21" y="26.5" text-anchor="middle" font-size="3" fill="#5A6572">obras</text>`;
   legEl.innerHTML = parts.map(p =>
     `<div><i style="background:${p.col}"></i>${esc(p.l)} — <b>${fmtN(p.v)}</b> (${(p.v/total*100).toFixed(1)}%)</div>`).join('');
 }
@@ -629,6 +729,9 @@ const lvlTag = lvl =>
 
 const alChips = f => f.map(x=>`<span class="al ${x.sev}">${esc(x.txt)}</span>`).join(' ');
 
+function resetSelect(el){
+  if (el && el.options) while (el.options.length > 1) el.remove(1);
+}
 function statusTag(s){
   const cls = s==='Concluído'?'t-ok': s==='Cancelado'?'t-can':
     ['Sem Evolução','Paralisado Com Termo'].includes(s)?'t-par':
@@ -647,7 +750,7 @@ function buildGeral(){
   const vTot  = DATA.reduce((a,r)=>a+r.vt,0);
   const crit = ALERTAS.filter(x=>x.lvl>=3).length;
   document.getElementById('kpis').innerHTML = `
-    <div class="kpi"><b>${fmtN(total)}</b><span>ações na carteira</span></div>
+    <div class="kpi"><b>${fmtN(total)}</b><span>obras na carteira</span></div>
     <div class="kpi ok"><b>${fmtN(DATA.filter(isDone).length)}</b><span>concluídas</span></div>
     <div class="kpi"><b>${fmtN(DATA.filter(isOngoing).length)}</b><span>em andamento</span></div>
     <div class="kpi warn"><b>${fmtN(stopped)}</b><span>paradas agora</span></div>
@@ -701,7 +804,7 @@ function buildAlertasTela(){
 
   const semContrato = DATA.filter(r => isOngoing(r) && !r.c && !r.dc).length;
   document.getElementById('al-note').innerHTML =
-    `${fmtN(semContrato)} ações em andamento ainda não têm contrato/execução registrada na planilha e ficam fora destes alertas — elas estão em fase anterior (projeto, licitação).`;
+    `${fmtN(semContrato)} obras em andamento ainda não têm contrato/execução registrada na planilha e ficam fora destes alertas — elas estão em fase anterior (projeto, licitação). Ações de convênio e de outras classificações ficam fora de toda a análise.`;
 
   document.getElementById('ev-n').textContent = fmtN(EVID.n);
   document.getElementById('ev-base').textContent = (EVID.base*100).toFixed(0)+'%';
@@ -710,6 +813,7 @@ function buildAlertasTela(){
     null, EVID.base);
 
   const fill = document.getElementById('al-orgao');
+  resetSelect(fill);
   [...new Set(ALERTAS.map(x=>x.r.o).filter(Boolean))].sort().forEach(v => {
     const o = document.createElement('option'); o.value = o.textContent = v; fill.appendChild(o);
   });
@@ -806,6 +910,7 @@ function buildParalisacoes(){
     `Das paralisações que já terminaram (${fmtN(allDur.length)}), a mediana foi de <b>${Math.round(median(allDur))} dias parada</b>. Cada paralisação evitada vale meses de cronograma.`;
 
   const fill = document.getElementById('po-orgao');
+  resetSelect(fill);
   [...new Set(PARADAS.map(x=>x.r.o).filter(Boolean))].sort().forEach(v => {
     const o = document.createElement('option'); o.value = o.textContent = v; fill.appendChild(o);
   });
@@ -834,6 +939,51 @@ function renderParadas(){
   document.getElementById('po-page').textContent = (poPage+1)+' / '+pages;
   document.getElementById('po-prev').disabled = poPage===0;
   document.getElementById('po-next').disabled = poPage>=pages-1;
+}
+
+/* ============================================================
+   EMPRESAS PROBLEMÁTICAS — campo dedicado
+   Critério (o mesmo do alerta 🏢): 5+ contratos já encerrados
+   e taxa de problema suavizada ≥ 35%. Ordenadas por quanto
+   ainda têm em obras ativas — onde a informação vira ação.
+   ============================================================ */
+function buildEmpProb(){
+  const list = CONTR.map(c => {
+    const e = empRate(c.key);
+    if (!e || e.n < 5 || e.rate < 0.35) return null;
+    const ativas = c.rows.filter(isOngoing);
+    const vAtivo = ativas.reduce((a,r)=>a+Math.max(r.vt-r.vp,0),0);
+    return {c, e, nAtivas: ativas.length, vAtivo};
+  }).filter(Boolean)
+    .sort((a,b) => b.vAtivo - a.vAtivo || b.nAtivas - a.nAtivas || b.e.rate - a.e.rate);
+
+  const comAtivas = list.filter(x=>x.nAtivas>0);
+  const vTotal = comAtivas.reduce((a,x)=>a+x.vAtivo,0);
+  document.getElementById('ep-sub').innerHTML =
+    `Empresas em que <b>pelo menos 35% dos contratos já encerrados deram problema</b> (mín. 5 contratos). ` +
+    `No histórico, obras dessas empresas terminaram mal em <b>${(EVID.itens[0].v*100).toFixed(0)}%</b> dos casos. ` +
+    (comAtivas.length
+      ? `<span style="color:var(--risk)"><b>${comAtivas.length}</b> delas ainda têm obras ativas — <b>${fmtBRL(vTotal)}</b> a executar sob risco.</span>`
+      : 'Nenhuma delas tem obras ativas no momento.');
+
+  document.getElementById('ep-rows').innerHTML = list.map(x => `
+    <div class="ep" tabindex="0" role="button" data-k="${esc(x.c.key)}">
+      <div class="who">
+        <b>${esc(x.c.name)}</b>
+        <small>${x.c.cnpj?'CNPJ '+esc(x.c.cnpj)+' · ':''}${fmtBRL(x.c.vt)} contratados no total</small>
+      </div>
+      <div class="frase">${x.e.p} de ${x.e.n} contratos deram problema</div>
+      <div class="expo ${x.nAtivas? '':'zero'}">
+        ${x.nAtivas
+          ? `<b>${x.nAtivas} obra${x.nAtivas>1?'s':''} ativa${x.nAtivas>1?'s':''} agora</b>${fmtBRL(x.vAtivo)} a executar`
+          : `<b>sem obras ativas</b>histórico apenas`}
+      </div>
+    </div>`).join('') || '<div class="sub" style="padding:14px 0">Nenhuma empresa se encaixa no critério. 🎉</div>';
+
+  document.querySelectorAll('.ep').forEach(el => {
+    el.addEventListener('click', () => { showContr(el.dataset.k); });
+    el.addEventListener('keydown', e => { if(e.key==='Enter') showContr(el.dataset.k); });
+  });
 }
 
 /* ============================================================
@@ -884,6 +1034,7 @@ function showContr(key){
       </tr>`).join('')}</tbody>
     </table></div>`;
   document.getElementById('c-list').style.display='none';
+  document.getElementById('ep-card').style.display='none';
   document.getElementById('c-detail').style.display='block';
   window.scrollTo({top:0});
 }
@@ -905,7 +1056,7 @@ function renderObras(){
   const list = oFiltered();
   const pages = Math.max(1, Math.ceil(list.length/PER));
   oPage = Math.min(oPage, pages-1);
-  document.getElementById('o-count').textContent = fmtN(list.length)+' ações encontradas';
+  document.getElementById('o-count').textContent = fmtN(list.length)+' obras encontradas';
   document.getElementById('o-body').innerHTML = list.slice(oPage*PER,(oPage+1)*PER).map(r=>`<tr>
     <td class="num">${esc(r.id)}</td>
     <td>${esc(r.n)}${r.c?`<div style="font:400 .68rem var(--mono);color:var(--ink-2)">${esc(r.c)}</div>`:''}</td>
@@ -919,6 +1070,7 @@ function renderObras(){
 function buildObrasFilters(){
   const fill = (id, vals) => {
     const el = document.getElementById(id);
+    resetSelect(el);
     [...new Set(vals.filter(Boolean))].sort().forEach(v => {
       const o = document.createElement('option'); o.value = o.textContent = v; el.appendChild(o);
     });
@@ -944,6 +1096,7 @@ document.getElementById('nav').addEventListener('click', e => {
 document.getElementById('c-back').addEventListener('click', () => {
   document.getElementById('c-detail').style.display='none';
   document.getElementById('c-list').style.display='block';
+  document.getElementById('ep-card').style.display='block';
 });
 
 function buildAll(){
@@ -955,6 +1108,7 @@ function buildAll(){
   buildAlertasTela();
   buildParalisacoes();
   renderContr();
+  buildEmpProb();
   buildObrasFilters();
   renderObras();
 }
