@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Obras — Análise Preditiva</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F2F3F1;        /* concreto claro */
+  --card:#FFFFFF;
+  --ink:#1C242E;       /* grafite */
+  --ink-2:#5A6572;
+  --line:#DDE1DE;
+  --steel:#2E5E7E;     /* azul-aço institucional */
+  --steel-soft:#E4EDF3;
+  --ok:#3E7C4F;
+  --warn:#C98A1B;
+  --risk:#B3382C;
+  --risk-soft:#F6E7E4;
+  --mono:'IBM Plex Mono',monospace;
+  --radius:6px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:15px}
+body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;line-height:1.5}
+h1,h2,h3,.disp{font-family:'Barlow Semi Condensed',sans-serif;letter-spacing:.01em}
+
+/* ===== topo ===== */
+header{background:var(--ink);color:#EDEFEA;padding:0 20px}
+.hd-in{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.brand{padding:14px 0 10px}
+.brand h1{font-size:1.25rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.brand small{display:block;color:#9AA6B0;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase}
+nav{display:flex;gap:2px;margin-left:auto}
+nav button{background:none;border:none;color:#B9C2C9;font:600 .85rem 'Barlow Semi Condensed';text-transform:uppercase;letter-spacing:.08em;padding:18px 14px 14px;cursor:pointer;border-bottom:3px solid transparent}
+nav button:hover{color:#fff}
+nav button.on{color:#fff;border-bottom-color:var(--warn)}
+nav button:focus-visible{outline:2px solid var(--warn);outline-offset:-2px}
+
+.wrap{max-width:1240px;margin:0 auto;padding:24px 20px 64px}
+.screen{display:none}
+.screen.on{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.screen.on{animation:none}}
+
+/* ===== estado de carga ===== */
+#loading{padding:80px 20px;text-align:center;color:var(--ink-2)}
+.spin{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--steel);border-radius:50%;margin:0 auto 14px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#loadmsg{font-family:var(--mono);font-size:.8rem}
+
+/* ===== KPIs ===== */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;border-top:3px solid var(--steel)}
+.kpi.risk{border-top-color:var(--risk)}
+.kpi.warn{border-top-color:var(--warn)}
+.kpi.ok{border-top-color:var(--ok)}
+.kpi b{display:block;font:700 1.7rem 'Barlow Semi Condensed';line-height:1.15}
+.kpi span{font-size:.74rem;color:var(--ink-2);text-transform:uppercase;letter-spacing:.07em}
+
+/* ===== cartões e grades ===== */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:860px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px}
+.card h2{font-size:1.02rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.card .sub{font-size:.8rem;color:var(--ink-2);margin-bottom:14px}
+
+/* ===== barras ===== */
+.bar-row{display:grid;grid-template-columns:170px 1fr 76px;gap:10px;align-items:center;padding:5px 0;font-size:.85rem}
+.bar-row .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{background:var(--bg);border-radius:3px;height:16px;overflow:hidden}
+.bar-fill{height:100%;background:var(--steel);border-radius:3px;min-width:2px}
+.bar-fill.r{background:var(--risk)}.bar-fill.w{background:var(--warn)}.bar-fill.g{background:var(--ok)}
+.bar-row .val{font-family:var(--mono);font-size:.76rem;text-align:right;color:var(--ink-2)}
+
+/* status donut */
+.donut-wrap{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+.legend{font-size:.82rem;display:grid;gap:5px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:7px}
+
+/* ===== faixa de risco (assinatura) ===== */
+.stake{display:grid;grid-template-columns:34px 1fr 210px 60px;gap:12px;align-items:center;padding:10px 8px;border-bottom:1px solid var(--line);cursor:pointer}
+.stake:hover{background:var(--steel-soft)}
+.stake:focus-visible{outline:2px solid var(--steel)}
+.stake .pos{font:600 .8rem var(--mono);color:var(--ink-2)}
+.stake .who b{display:block;font-size:.88rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stake .who small{font:400 .7rem var(--mono);color:var(--ink-2)}
+.mix{display:flex;height:18px;border-radius:3px;overflow:hidden;background:var(--bg)}
+.mix i{display:block;height:100%}
+.mix .ok{background:var(--ok)}.mix .and{background:var(--steel)}
+.mix .par{background:repeating-linear-gradient(45deg,var(--warn),var(--warn) 4px,#E8B75A 4px,#E8B75A 8px)}
+.mix .can{background:var(--risk)}
+.score{font:700 1.05rem 'Barlow Semi Condensed';text-align:right}
+.s-hi{color:var(--risk)}.s-md{color:var(--warn)}.s-lo{color:var(--ok)}
+
+/* detalhe de contratada */
+#c-detail{display:none}
+.back{background:none;border:none;color:var(--steel);font:600 .85rem 'IBM Plex Sans';cursor:pointer;padding:0;margin-bottom:12px}
+.back:hover{text-decoration:underline}
+
+/* ===== tabela ===== */
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.filters select,.filters input{border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px;font:400 .85rem 'IBM Plex Sans';background:#fff;color:var(--ink)}
+.filters input{flex:1;min-width:200px}
+table{width:100%;border-collapse:collapse;font-size:.83rem}
+th{text-align:left;font:600 .72rem 'Barlow Semi Condensed';text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2);padding:8px 10px;border-bottom:2px solid var(--ink);white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:nowrap}
+.tag{display:inline-block;font:600 .68rem 'Barlow Semi Condensed';text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:3px;white-space:nowrap}
+.t-ok{background:#E4F0E7;color:var(--ok)}
+.t-and{background:var(--steel-soft);color:var(--steel)}
+.t-par{background:#F7EDDA;color:#8A5E10}
+.t-can{background:var(--risk-soft);color:var(--risk)}
+.t-neu{background:var(--bg);color:var(--ink-2)}
+.pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;font-size:.82rem;color:var(--ink-2)}
+.pager button{border:1px solid var(--line);background:#fff;border-radius:var(--radius);padding:6px 12px;cursor:pointer;font:600 .8rem 'IBM Plex Sans'}
+.pager button:disabled{opacity:.4;cursor:default}
+
+/* config */
+.cfg label{display:block;font-size:.82rem;font-weight:600;margin:14px 0 5px}
+.cfg input{width:100%;border:1px solid var(--line);border-radius:var(--radius);padding:9px 11px;font:400 .85rem var(--mono)}
+.cfg button{margin-top:14px;background:var(--steel);color:#fff;border:none;border-radius:var(--radius);padding:10px 18px;font:600 .85rem 'IBM Plex Sans';cursor:pointer}
+.cfg .hint{font-size:.78rem;color:var(--ink-2);margin-top:8px}
+#src-badge{font:500 .68rem var(--mono);color:#9AA6B0;padding-bottom:10px}
+
+.note{font-size:.75rem;color:var(--ink-2);border-left:3px solid var(--warn);padding:6px 10px;background:#FBF6EC;border-radius:0 4px 4px 0;margin-top:12px}
+@media(max-width:700px){
+  .stake{grid-template-columns:26px 1fr 90px 48px}
+  .bar-row{grid-template-columns:110px 1fr 62px}
+  th:nth-child(5),td:nth-child(5){display:none}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hd-in">
+    <div class="brand">
+      <h1>Painel de Obras</h1>
+      <small>Análise preditiva · risco de execução</small>
+    </div>
+    <nav id="nav">
+      <button data-s="geral" class="on">Visão geral</button>
+      <button data-s="contratadas">Contratadas</button>
+      <button data-s="obras">Obras</button>
+      <button data-s="paralisacoes">Paralisações</button>
+      <button data-s="config">⚙</button>
+    </nav>
+    <div id="src-badge"></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div id="loading">
+    <div class="spin"></div>
+    <div id="loadmsg">carregando dados…</div>
+  </div>
+
+  <!-- ============ VISÃO GERAL ============ -->
+  <section class="screen" id="s-geral">
+    <div class="kpis" id="kpis"></div>
+    <div class="grid2">
+      <div class="card">
+        <h2>Situação da carteira</h2>
+        <div class="sub">Distribuição das ações por status</div>
+        <div class="donut-wrap">
+          <svg id="donut" width="150" height="150" viewBox="0 0 42 42" role="img" aria-label="Distribuição por status"></svg>
+          <div class="legend" id="donut-leg"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Obras em andamento com maior risco</h2>
+        <div class="sub">Risco previsto pelo histórico da contratada + paralisação ativa</div>
+        <div id="pred-list"></div>
+      </div>
+      <div class="card">
+        <h2>Problemas por órgão</h2>
+        <div class="sub">% de ações canceladas, sem evolução ou paralisadas</div>
+        <div id="orgao-bars"></div>
+      </div>
+      <div class="card">
+        <h2>Problemas por tipologia</h2>
+        <div class="sub">% de ações com problema (mín. 30 ações)</div>
+        <div id="tipo-bars"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CONTRATADAS ============ -->
+  <section class="screen" id="s-contratadas">
+    <div id="c-list" class="card">
+      <h2>Ranking de risco das contratadas</h2>
+      <div class="sub">Empresas com 5+ contratos, ordenadas pelo índice de risco (0–100). A faixa mostra a composição da carteira: <span style="color:var(--ok)">■ concluída</span> · <span style="color:var(--steel)">■ em andamento</span> · <span style="color:var(--warn)">▨ paralisada/sem evolução</span> · <span style="color:var(--risk)">■ cancelada</span></div>
+      <div class="filters">
+        <input id="c-search" type="search" placeholder="Buscar empresa ou CNPJ…">
+        <select id="c-min">
+          <option value="5">Mín. 5 contratos</option>
+          <option value="10">Mín. 10 contratos</option>
+          <option value="30">Mín. 30 contratos</option>
+        </select>
+      </div>
+      <div id="c-rows"></div>
+      <div class="note">Índice de risco = 60 × taxa de contratos com problema (cancelado, sem evolução ou paralisado) + 40 × taxa histórica de paralisação. É um indicador de triagem, não um julgamento definitivo da empresa.</div>
+    </div>
+    <div id="c-detail" class="card">
+      <button class="back" id="c-back">← voltar ao ranking</button>
+      <div id="c-detail-body"></div>
+    </div>
+  </section>
+
+  <!-- ============ OBRAS ============ -->
+  <section class="screen" id="s-obras">
+    <div class="card">
+      <h2>Todas as ações</h2>
+      <div class="sub" id="o-count"></div>
+      <div class="filters">
+        <input id="o-search" type="search" placeholder="Buscar por nome, município, contratada…">
+        <select id="o-status"><option value="">Status: todos</option></select>
+        <select id="o-orgao"><option value="">Órgão: todos</option></select>
+        <select id="o-tipo"><option value="">Tipologia: todas</option></select>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>ID</th><th>Ação</th><th>Órgão</th><th>Status</th><th>Município</th><th>Exec.</th><th>Valor total</th></tr></thead>
+          <tbody id="o-body"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="o-prev">← Anterior</button>
+        <span id="o-page"></span>
+        <button id="o-next">Próxima →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PARALISAÇÕES ============ -->
+  <section class="screen" id="s-paralisacoes">
+    <div class="grid2">
+      <div class="card">
+        <h2>Por que as obras param</h2>
+        <div class="sub">Motivos de paralisação categorizados por palavras-chave</div>
+        <div id="motivo-bars"></div>
+      </div>
+      <div class="card">
+        <h2>Paralisações sem reinício</h2>
+        <div class="sub">Obras com paralisação registrada e nenhuma data de reinício — atenção imediata</div>
+        <div id="par-open"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CONFIG ============ -->
+  <section class="screen" id="s-config">
+    <div class="card cfg" style="max-width:640px">
+      <h2>Fonte de dados</h2>
+      <div class="sub">O painel busca os dados na API do Apps Script. Sem URL configurada, tenta um arquivo <code>data.json</code> na mesma pasta.</div>
+      <label for="cfg-url">URL do Web App (Apps Script)</label>
+      <input id="cfg-url" type="url" placeholder="https://script.google.com/macros/s/…/exec">
+      <button id="cfg-save">Salvar e recarregar</button>
+      <div class="hint">A URL fica salva só neste navegador (localStorage). Cada pessoa da equipe configura uma vez.</div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ============================================================
+   CONFIG E CARGA
+   ============================================================ */
+const LS_KEY = 'obras_api_url';
+let DATA = [];          // registros normalizados
+let CONTR = [];         // agregados por contratada
+const fmtBRL = v => v >= 1e9 ? 'R$ '+(v/1e9).toFixed(2)+' bi'
+              : v >= 1e6 ? 'R$ '+(v/1e6).toFixed(1)+' mi'
+              : v >= 1e3 ? 'R$ '+(v/1e3).toFixed(0)+' mil'
+              : 'R$ '+v.toFixed(0);
+const fmtN = v => v.toLocaleString('pt-BR');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* aceita tanto o data.json compacto quanto a resposta do Apps Script
+   (linhas com os cabeçalhos originais da planilha) */
+function normalize(raw){
+  const money = v => {
+    if (typeof v === 'number') return v;
+    if (!v || v === '-') return 0;
+    const n = parseFloat(String(v).replace(/R\$|\./g,'').replace(',','.'));
+    return isNaN(n) ? 0 : n;
+  };
+  const pct = v => {
+    if (typeof v === 'number') return v;
+    if (!v || v === '-') return null;
+    const n = parseFloat(String(v).replace('%','').replace(',','.'));
+    return isNaN(n) ? null : n;
+  };
+  const cl = v => (v == null || String(v).trim() === '-' ) ? '' : String(v).trim();
+  return raw.map(r => {
+    if ('n' in r && 's' in r) return r; // já compacto
+    const contr = cl(r['Nome do Contratado']);
+    let cj = '', c = contr;
+    const m = contr.match(/^(\d{8,14})\s*-\s*(.+)$/);
+    if (m) { cj = m[1]; c = m[2].trim(); }
+    return {
+      id: cl(r['ID da Ação']), n: cl(r['Nome da Ação']), o: cl(r['Órgão da Ação']),
+      s: cl(r['Status']), p: pct(r['Percentual de Execução da Ação']),
+      t: cl(r['TIPOLOGIA']), m: cl(r['Localização (Município)']),
+      vt: money(r['Valor Total']), vp: money(r['Valor pago total']),
+      dp: cl(r['Data da Última Paralisação']), dr: cl(r['Data de reinício da Última Paralisação']),
+      mo: cl(r['Motivo da Paralisação']), cj, c
+    };
+  });
+}
+
+async function load(){
+  const url = localStorage.getItem(LS_KEY);
+  const src = url ? url + (url.includes('?') ? '&' : '?') + 'action=read' : 'data.json';
+  document.getElementById('loadmsg').textContent = 'carregando de ' + (url ? 'Apps Script' : 'data.json') + '…';
+  try{
+    const res = await fetch(src);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    DATA = normalize(Array.isArray(json) ? json : (json.rows || json.data || []));
+    if (!DATA.length) throw new Error('resposta vazia');
+    document.getElementById('src-badge').textContent =
+      (url ? 'fonte: apps script' : 'fonte: data.json') + ' · ' + fmtN(DATA.length) + ' registros';
+    buildAll();
+    document.getElementById('loading').style.display = 'none';
+    show(location.hash.replace('#','') || 'geral');
+  }catch(e){
+    document.getElementById('loadmsg').innerHTML =
+      'Não consegui carregar os dados (' + esc(e.message) + ').<br>Verifique a URL da API na aba ⚙ Config.';
+  }
+}
+
+/* ============================================================
+   CLASSIFICAÇÃO
+   ============================================================ */
+const isProblem = r => ['Cancelado','Sem Evolução','Paralisado Com Termo'].includes(r.s);
+const isOngoing = r => ['Em desenvolvimento','Em aberto'].includes(r.s);
+const isDone    = r => r.s === 'Concluído';
+const hasOpenStop = r => r.dp && !r.dr && !isDone(r) && r.s !== 'Cancelado';
+
+const MOTIVO_CATS = [
+  ['Clima / chuvas', /CHUVA|INVERNO|CLIM[ÁA]T|PLUVIO/i],
+  ['Financeiro / pagamento', /FINANC|PAGAMENT|RECURSO|OR[ÇC]AMENT|REPASSE|INADIMPL|MEDI[ÇC][ÃA]O/i],
+  ['Abandono da empresa', /ABANDON|DESIST|EMPRESA (N[ÃA]O|PAROU|AUSENTE)/i],
+  ['Projeto / readequação', /PROJETO|READEQUA|REVIS[ÃA]O|ADITIVO|ALTERA[ÇC]/i],
+  ['Contratual / jurídico', /RESCIS|JUDICI|LICITA|CONTRAT|TCE|JUSTI[ÇC]A|MINIST[ÉE]RIO/i],
+  ['Material / fornecimento', /MATERIA|FORNEC|INSUMO|EQUIPAMENTO/i],
+];
+function motivoCat(mo){
+  for (const [name, rx] of MOTIVO_CATS) if (rx.test(mo)) return name;
+  return 'Outros / não detalhado';
+}
+
+function buildContractors(){
+  const map = new Map();
+  for (const r of DATA){
+    if (!r.c) continue;
+    const key = r.cj || r.c;
+    if (!map.has(key)) map.set(key, {key, name:r.c, cnpj:r.cj, rows:[]});
+    map.get(key).rows.push(r);
+  }
+  CONTR = [...map.values()].map(c => {
+    const n = c.rows.length;
+    const done = c.rows.filter(isDone).length;
+    const ong  = c.rows.filter(isOngoing).length;
+    const can  = c.rows.filter(r => r.s === 'Cancelado').length;
+    const parS = c.rows.filter(r => ['Sem Evolução','Paralisado Com Termo'].includes(r.s)).length;
+    const prob = c.rows.filter(isProblem).length;
+    const stops= c.rows.filter(r => r.dp).length;
+    const vt   = c.rows.reduce((a,r)=>a+r.vt,0);
+    const vRisk= c.rows.filter(r => isProblem(r)||hasOpenStop(r)).reduce((a,r)=>a+r.vt,0);
+    const score= Math.round(60*(prob/n) + 40*(stops/n));
+    return {...c, n, done, ong, can, parS, prob, stops, vt, vRisk, score};
+  }).sort((a,b)=> b.score - a.score || b.n - a.n);
+}
+
+/* ============================================================
+   COMPONENTES
+   ============================================================ */
+function bars(el, items, cls){
+  const max = Math.max(...items.map(i=>i.v), 1);
+  el.innerHTML = items.map(i => `
+    <div class="bar-row">
+      <div class="lbl" title="${esc(i.l)}">${esc(i.l)}</div>
+      <div class="bar-track"><div class="bar-fill ${i.c||cls||''}" style="width:${(i.v/max*100).toFixed(1)}%"></div></div>
+      <div class="val">${i.txt ?? fmtN(i.v)}</div>
+    </div>`).join('');
+}
+
+function donut(el, legEl, parts){
+  const total = parts.reduce((a,p)=>a+p.v,0);
+  let off = 25, svg = '';
+  for (const p of parts){
+    const frac = p.v/total*100;
+    svg += `<circle cx="21" cy="21" r="15.9" fill="none" stroke="${p.col}" stroke-width="6"
+      stroke-dasharray="${frac.toFixed(2)} ${(100-frac).toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}"></circle>`;
+    off -= frac;
+  }
+  el.innerHTML = svg + `<text x="21" y="20" text-anchor="middle" font-size="6.5" font-weight="700" font-family="Barlow Semi Condensed">${fmtN(total)}</text>
+    <text x="21" y="26.5" text-anchor="middle" font-size="3" fill="#5A6572">ações</text>`;
+  legEl.innerHTML = parts.map(p =>
+    `<div><i style="background:${p.col}"></i>${esc(p.l)} — <b>${fmtN(p.v)}</b> (${(p.v/total*100).toFixed(1)}%)</div>`).join('');
+}
+
+/* ============================================================
+   TELAS
+   ============================================================ */
+function buildGeral(){
+  const total = DATA.length;
+  const prob = DATA.filter(isProblem).length;
+  const openStops = DATA.filter(hasOpenStop).length;
+  const vRisk = DATA.filter(r => isProblem(r)||hasOpenStop(r)).reduce((a,r)=>a+r.vt,0);
+  const vTot  = DATA.reduce((a,r)=>a+r.vt,0);
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><b>${fmtN(total)}</b><span>ações na carteira</span></div>
+    <div class="kpi ok"><b>${fmtN(DATA.filter(isDone).length)}</b><span>concluídas</span></div>
+    <div class="kpi"><b>${fmtN(DATA.filter(isOngoing).length)}</b><span>em andamento</span></div>
+    <div class="kpi risk"><b>${fmtN(prob)}</b><span>com problema (${(prob/total*100).toFixed(1)}%)</span></div>
+    <div class="kpi warn"><b>${fmtN(openStops)}</b><span>paralisadas sem reinício</span></div>
+    <div class="kpi risk"><b>${fmtBRL(vRisk)}</b><span>valor em risco / ${fmtBRL(vTot)} total</span></div>`;
+
+  const st = {};
+  DATA.forEach(r => st[r.s] = (st[r.s]||0)+1);
+  const COLS = {'Concluído':'#3E7C4F','Em desenvolvimento':'#2E5E7E','Em aberto':'#7FA3BC',
+    'Cancelado':'#B3382C','Sem Evolução':'#C98A1B','Paralisado Com Termo':'#8A5E10'};
+  donut(document.getElementById('donut'), document.getElementById('donut-leg'),
+    Object.entries(st).sort((a,b)=>b[1]-a[1]).map(([l,v])=>({l,v,col:COLS[l]||'#999'})));
+
+  // problemas por órgão
+  const org = {};
+  DATA.forEach(r => { if(!r.o) return; org[r.o] = org[r.o]||{t:0,p:0}; org[r.o].t++; if(isProblem(r)) org[r.o].p++; });
+  bars(document.getElementById('orgao-bars'),
+    Object.entries(org).filter(([,v])=>v.t>=30)
+      .map(([l,v])=>({l, v:v.p/v.t*100, txt:(v.p/v.t*100).toFixed(1)+'% ('+v.p+')', c: v.p/v.t>0.25?'r':v.p/v.t>0.15?'w':''}))
+      .sort((a,b)=>b.v-a.v).slice(0,10));
+
+  const tip = {};
+  DATA.forEach(r => { if(!r.t) return; tip[r.t] = tip[r.t]||{t:0,p:0}; tip[r.t].t++; if(isProblem(r)) tip[r.t].p++; });
+  bars(document.getElementById('tipo-bars'),
+    Object.entries(tip).filter(([,v])=>v.t>=30)
+      .map(([l,v])=>({l, v:v.p/v.t*100, txt:(v.p/v.t*100).toFixed(1)+'% ('+v.p+')', c: v.p/v.t>0.25?'r':v.p/v.t>0.15?'w':''}))
+      .sort((a,b)=>b.v-a.v).slice(0,10));
+
+  // preditivo: obras em andamento
+  const scoreByKey = new Map(CONTR.map(c=>[c.key, c]));
+  const pred = DATA.filter(isOngoing).map(r => {
+    const c = r.c ? scoreByKey.get(r.cj || r.c) : null;
+    let sc = c && c.n >= 3 ? c.score : null;
+    if (sc !== null && hasOpenStop(r)) sc = Math.min(100, sc + 25);
+    else if (sc === null && hasOpenStop(r)) sc = 70;
+    return {r, c, sc};
+  }).filter(x => x.sc !== null).sort((a,b)=>b.sc-a.sc).slice(0,8);
+  document.getElementById('pred-list').innerHTML = pred.map(x => `
+    <div class="bar-row" style="grid-template-columns:1fr 60px">
+      <div>
+        <div class="lbl" title="${esc(x.r.n)}" style="font-size:.84rem">${esc(x.r.n)}</div>
+        <div style="font:400 .7rem var(--mono);color:var(--ink-2)">${esc(x.r.o)} · ${esc(x.r.m||'—')} · ${x.c?esc(x.c.name):'sem contratada'}${hasOpenStop(x.r)?' · <span style="color:var(--risk)">PARALISADA</span>':''}</div>
+      </div>
+      <div class="score ${x.sc>=50?'s-hi':x.sc>=30?'s-md':'s-lo'}">${x.sc}</div>
+    </div>`).join('') || '<div class="sub">Sem obras em andamento com contratada de histórico conhecido.</div>';
+}
+
+function renderContr(){
+  const q = document.getElementById('c-search').value.toLowerCase();
+  const min = +document.getElementById('c-min').value;
+  const list = CONTR.filter(c => c.n >= min &&
+    (!q || c.name.toLowerCase().includes(q) || c.cnpj.includes(q))).slice(0,60);
+  document.getElementById('c-rows').innerHTML = list.map((c,i) => `
+    <div class="stake" tabindex="0" role="button" data-k="${esc(c.key)}">
+      <div class="pos">${String(i+1).padStart(2,'0')}</div>
+      <div class="who"><b title="${esc(c.name)}">${esc(c.name)}</b><small>${c.cnpj?'CNPJ '+esc(c.cnpj)+' · ':''}${c.n} contratos · ${fmtBRL(c.vt)}</small></div>
+      <div class="mix" title="concluídas ${c.done} · andamento ${c.ong} · paralisadas/sem evolução ${c.parS} · canceladas ${c.can}">
+        <i class="ok" style="width:${c.done/c.n*100}%"></i><i class="and" style="width:${c.ong/c.n*100}%"></i>
+        <i class="par" style="width:${c.parS/c.n*100}%"></i><i class="can" style="width:${c.can/c.n*100}%"></i>
+      </div>
+      <div class="score ${c.score>=50?'s-hi':c.score>=30?'s-md':'s-lo'}">${c.score}</div>
+    </div>`).join('') || '<div class="sub" style="padding:14px 0">Nenhuma empresa encontrada.</div>';
+  document.querySelectorAll('.stake').forEach(el => {
+    el.addEventListener('click', () => showContr(el.dataset.k));
+    el.addEventListener('keydown', e => { if(e.key==='Enter') showContr(el.dataset.k); });
+  });
+}
+
+function showContr(key){
+  const c = CONTR.find(x => x.key === key);
+  if (!c) return;
+  const rows = [...c.rows].sort((a,b)=>b.vt-a.vt);
+  document.getElementById('c-detail-body').innerHTML = `
+    <h2 style="font-size:1.2rem">${esc(c.name)}</h2>
+    <div class="sub">${c.cnpj?'CNPJ '+esc(c.cnpj)+' · ':''}índice de risco <b class="${c.score>=50?'s-hi':c.score>=30?'s-md':'s-lo'}">${c.score}</b></div>
+    <div class="kpis" style="margin:14px 0">
+      <div class="kpi"><b>${c.n}</b><span>contratos</span></div>
+      <div class="kpi ok"><b>${c.done}</b><span>concluídos</span></div>
+      <div class="kpi warn"><b>${c.parS}</b><span>paralisados / sem evolução</span></div>
+      <div class="kpi risk"><b>${c.can}</b><span>cancelados</span></div>
+      <div class="kpi risk"><b>${fmtBRL(c.vRisk)}</b><span>valor em risco</span></div>
+    </div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>ID</th><th>Ação</th><th>Órgão</th><th>Status</th><th>Exec.</th><th>Valor</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr>
+        <td class="num">${esc(r.id)}</td><td>${esc(r.n)}${r.dp&&!r.dr?' <span class="tag t-par">paralisada</span>':''}</td>
+        <td>${esc(r.o)}</td><td>${statusTag(r.s)}</td>
+        <td class="num">${r.p==null?'—':r.p.toFixed(0)+'%'}</td><td class="num">${r.vt?fmtBRL(r.vt):'—'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  document.getElementById('c-list').style.display='none';
+  document.getElementById('c-detail').style.display='block';
+  window.scrollTo({top:0});
+}
+
+function statusTag(s){
+  const cls = s==='Concluído'?'t-ok': s==='Cancelado'?'t-can':
+    ['Sem Evolução','Paralisado Com Termo'].includes(s)?'t-par':
+    ['Em desenvolvimento','Em aberto'].includes(s)?'t-and':'t-neu';
+  return `<span class="tag ${cls}">${esc(s)}</span>`;
+}
+
+/* ===== obras (tabela paginada) ===== */
+let oPage = 0; const PER = 50;
+function oFiltered(){
+  const q = document.getElementById('o-search').value.toLowerCase();
+  const st = document.getElementById('o-status').value;
+  const og = document.getElementById('o-orgao').value;
+  const tp = document.getElementById('o-tipo').value;
+  return DATA.filter(r =>
+    (!st || r.s===st) && (!og || r.o===og) && (!tp || r.t===tp) &&
+    (!q || r.n.toLowerCase().includes(q) || r.m.toLowerCase().includes(q) || r.c.toLowerCase().includes(q) || r.id===q));
+}
+function renderObras(){
+  const list = oFiltered();
+  const pages = Math.max(1, Math.ceil(list.length/PER));
+  oPage = Math.min(oPage, pages-1);
+  document.getElementById('o-count').textContent = fmtN(list.length)+' ações encontradas';
+  document.getElementById('o-body').innerHTML = list.slice(oPage*PER,(oPage+1)*PER).map(r=>`<tr>
+    <td class="num">${esc(r.id)}</td>
+    <td>${esc(r.n)}${r.c?`<div style="font:400 .68rem var(--mono);color:var(--ink-2)">${esc(r.c)}</div>`:''}</td>
+    <td>${esc(r.o)}</td><td>${statusTag(r.s)}</td><td>${esc(r.m)||'—'}</td>
+    <td class="num">${r.p==null?'—':r.p.toFixed(0)+'%'}</td>
+    <td class="num">${r.vt?fmtBRL(r.vt):'—'}</td></tr>`).join('');
+  document.getElementById('o-page').textContent = (oPage+1)+' / '+pages;
+  document.getElementById('o-prev').disabled = oPage===0;
+  document.getElementById('o-next').disabled = oPage>=pages-1;
+}
+
+function buildObrasFilters(){
+  const fill = (id, vals) => {
+    const el = document.getElementById(id);
+    [...new Set(vals.filter(Boolean))].sort().forEach(v => {
+      const o = document.createElement('option'); o.value = o.textContent = v; el.appendChild(o);
+    });
+  };
+  fill('o-status', DATA.map(r=>r.s));
+  fill('o-orgao', DATA.map(r=>r.o));
+  fill('o-tipo', DATA.map(r=>r.t));
+}
+
+/* ===== paralisações ===== */
+function buildPar(){
+  const stops = DATA.filter(r=>r.dp);
+  const cats = {};
+  stops.forEach(r => { const c = motivoCat(r.mo); cats[c]=(cats[c]||0)+1; });
+  bars(document.getElementById('motivo-bars'),
+    Object.entries(cats).map(([l,v])=>({l,v})).sort((a,b)=>b.v-a.v), 'w');
+
+  const open = DATA.filter(hasOpenStop).sort((a,b)=>b.vt-a.vt).slice(0,25);
+  document.getElementById('par-open').innerHTML = `
+    <div class="sub"><b>${fmtN(DATA.filter(hasOpenStop).length)}</b> obras nessa situação — mostrando as 25 de maior valor</div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>Ação</th><th>Órgão</th><th>Parou em</th><th>Valor</th></tr></thead>
+      <tbody>${open.map(r=>`<tr>
+        <td>${esc(r.n)}<div style="font:400 .68rem var(--mono);color:var(--ink-2)">${esc(r.m)||''}${r.c?' · '+esc(r.c):''}</div></td>
+        <td>${esc(r.o)}</td><td class="num">${esc(r.dp)}</td><td class="num">${r.vt?fmtBRL(r.vt):'—'}</td></tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
+/* ============================================================
+   NAVEGAÇÃO
+   ============================================================ */
+function show(id){
+  if (!document.getElementById('s-'+id)) id = 'geral';
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.getElementById('s-'+id).classList.add('on');
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on', b.dataset.s===id));
+  location.hash = id;
+}
+document.getElementById('nav').addEventListener('click', e => {
+  if (e.target.dataset.s) show(e.target.dataset.s);
+});
+document.getElementById('c-back').addEventListener('click', () => {
+  document.getElementById('c-detail').style.display='none';
+  document.getElementById('c-list').style.display='block';
+});
+
+function buildAll(){
+  buildContractors();
+  buildGeral();
+  renderContr();
+  buildObrasFilters();
+  renderObras();
+  buildPar();
+}
+document.getElementById('c-search').addEventListener('input', renderContr);
+document.getElementById('c-min').addEventListener('change', renderContr);
+['o-search','o-status','o-orgao','o-tipo'].forEach(id =>
+  document.getElementById(id).addEventListener(id==='o-search'?'input':'change', ()=>{oPage=0;renderObras();}));
+document.getElementById('o-prev').addEventListener('click', ()=>{oPage--;renderObras();});
+document.getElementById('o-next').addEventListener('click', ()=>{oPage++;renderObras();});
+
+/* config */
+document.getElementById('cfg-url').value = localStorage.getItem(LS_KEY) || '';
+document.getElementById('cfg-save').addEventListener('click', () => {
+  const v = document.getElementById('cfg-url').value.trim();
+  if (v) localStorage.setItem(LS_KEY, v); else localStorage.removeItem(LS_KEY);
+  location.reload();
+});
+
+load();
+</script>
+</body>
+</html>
