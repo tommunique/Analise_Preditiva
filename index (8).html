@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Obras — Alertas e Risco</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F2F3F1;
+  --card:#FFFFFF;
+  --ink:#1C242E;
+  --ink-2:#5A6572;
+  --line:#DDE1DE;
+  --steel:#2E5E7E;
+  --steel-soft:#E4EDF3;
+  --ok:#3E7C4F;
+  --ok-soft:#E4F0E7;
+  --warn:#C98A1B;
+  --warn-soft:#F7EDDA;
+  --risk:#B3382C;
+  --risk-soft:#F6E7E4;
+  --mono:'IBM Plex Mono',monospace;
+  --radius:6px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:15px}
+body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;line-height:1.5}
+h1,h2,h3{font-family:'Barlow Semi Condensed',sans-serif;letter-spacing:.01em}
+
+header{background:var(--ink);color:#EDEFEA;padding:0 20px}
+.hd-in{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.brand{padding:14px 0 10px}
+.brand h1{font-size:1.25rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.brand small{display:block;color:#9AA6B0;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase}
+nav{display:flex;gap:2px;margin-left:auto;flex-wrap:wrap}
+nav button{background:none;border:none;color:#B9C2C9;font:600 .85rem 'Barlow Semi Condensed';text-transform:uppercase;letter-spacing:.08em;padding:18px 13px 14px;cursor:pointer;border-bottom:3px solid transparent}
+nav button:hover{color:#fff}
+nav button.on{color:#fff;border-bottom-color:var(--warn)}
+nav button:focus-visible{outline:2px solid var(--warn);outline-offset:-2px}
+
+.wrap{max-width:1240px;margin:0 auto;padding:24px 20px 64px}
+.screen{display:none}
+.screen.on{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.screen.on{animation:none}}
+
+#loading{padding:80px 20px;text-align:center;color:var(--ink-2)}
+.spin{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--steel);border-radius:50%;margin:0 auto 14px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#loadmsg{font-family:var(--mono);font-size:.8rem}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;border-top:3px solid var(--steel)}
+.kpi.risk{border-top-color:var(--risk)}
+.kpi.warn{border-top-color:var(--warn)}
+.kpi.ok{border-top-color:var(--ok)}
+.kpi b{display:block;font:700 1.7rem 'Barlow Semi Condensed';line-height:1.15}
+.kpi span{font-size:.74rem;color:var(--ink-2);text-transform:uppercase;letter-spacing:.07em}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:860px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px}
+.card h2{font-size:1.02rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.card .sub{font-size:.8rem;color:var(--ink-2);margin-bottom:14px}
+
+.bar-row{display:grid;grid-template-columns:190px 1fr 80px;gap:10px;align-items:center;padding:5px 0;font-size:.85rem}
+.bar-row .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{background:var(--bg);border-radius:3px;height:16px;overflow:hidden;position:relative}
+.bar-fill{height:100%;background:var(--steel);border-radius:3px;min-width:2px}
+.bar-fill.r{background:var(--risk)}.bar-fill.w{background:var(--warn)}.bar-fill.g{background:var(--ok)}
+.bar-row .val{font-family:var(--mono);font-size:.76rem;text-align:right;color:var(--ink-2)}
+.base-mark{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink);opacity:.55}
+
+.donut-wrap{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+.legend{font-size:.82rem;display:grid;gap:5px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:7px}
+
+/* alertas por obra */
+.al{display:inline-block;font:500 .72rem 'IBM Plex Sans';padding:2px 8px;border-radius:10px;margin:2px 4px 2px 0;white-space:nowrap}
+.al.bad{background:var(--risk-soft);color:#8A2A20;border:1px solid #E5C3BE}
+.al.mid{background:var(--warn-soft);color:#7A5210;border:1px solid #EAD3A0}
+.al.good{background:var(--ok-soft);color:#2C5E3B;border:1px solid #C4DCC9}
+.lvl{display:inline-block;font:700 .7rem 'Barlow Semi Condensed';text-transform:uppercase;letter-spacing:.06em;padding:3px 9px;border-radius:3px;white-space:nowrap}
+.lvl.crit{background:var(--risk);color:#fff}
+.lvl.alto{background:var(--warn);color:#fff}
+.lvl.aten{background:var(--warn-soft);color:#7A5210}
+
+.stake{display:grid;grid-template-columns:34px 1fr 210px 60px;gap:12px;align-items:center;padding:10px 8px;border-bottom:1px solid var(--line);cursor:pointer}
+.stake:hover{background:var(--steel-soft)}
+.stake:focus-visible{outline:2px solid var(--steel)}
+.stake .pos{font:600 .8rem var(--mono);color:var(--ink-2)}
+.stake .who b{display:block;font-size:.88rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stake .who small{font:400 .7rem var(--mono);color:var(--ink-2)}
+.mix{display:flex;height:18px;border-radius:3px;overflow:hidden;background:var(--bg)}
+.mix i{display:block;height:100%}
+.mix .ok{background:var(--ok)}.mix .and{background:var(--steel)}
+.mix .par{background:repeating-linear-gradient(45deg,var(--warn),var(--warn) 4px,#E8B75A 4px,#E8B75A 8px)}
+.mix .can{background:var(--risk)}
+.score{font:700 1.05rem 'Barlow Semi Condensed';text-align:right}
+.s-hi{color:var(--risk)}.s-md{color:var(--warn)}.s-lo{color:var(--ok)}
+
+#c-detail{display:none}
+.back{background:none;border:none;color:var(--steel);font:600 .85rem 'IBM Plex Sans';cursor:pointer;padding:0;margin-bottom:12px}
+.back:hover{text-decoration:underline}
+
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.filters select,.filters input{border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px;font:400 .85rem 'IBM Plex Sans';background:#fff;color:var(--ink)}
+.filters input{flex:1;min-width:200px}
+table{width:100%;border-collapse:collapse;font-size:.83rem}
+th{text-align:left;font:600 .72rem 'Barlow Semi Condensed';text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2);padding:8px 10px;border-bottom:2px solid var(--ink);white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:nowrap}
+.tag{display:inline-block;font:600 .68rem 'Barlow Semi Condensed';text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:3px;white-space:nowrap}
+.t-ok{background:var(--ok-soft);color:var(--ok)}
+.t-and{background:var(--steel-soft);color:var(--steel)}
+.t-par{background:var(--warn-soft);color:#8A5E10}
+.t-can{background:var(--risk-soft);color:var(--risk)}
+.t-neu{background:var(--bg);color:var(--ink-2)}
+.pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;font-size:.82rem;color:var(--ink-2)}
+.pager button{border:1px solid var(--line);background:#fff;border-radius:var(--radius);padding:6px 12px;cursor:pointer;font:600 .8rem 'IBM Plex Sans'}
+.pager button:disabled{opacity:.4;cursor:default}
+
+.cfg label{display:block;font-size:.82rem;font-weight:600;margin:14px 0 5px}
+.cfg input{width:100%;border:1px solid var(--line);border-radius:var(--radius);padding:9px 11px;font:400 .85rem var(--mono)}
+.cfg button{margin-top:14px;background:var(--steel);color:#fff;border:none;border-radius:var(--radius);padding:10px 18px;font:600 .85rem 'IBM Plex Sans';cursor:pointer}
+.cfg .hint{font-size:.78rem;color:var(--ink-2);margin-top:8px}
+#src-badge{font:500 .68rem var(--mono);color:#9AA6B0;padding-bottom:10px}
+
+.note{font-size:.75rem;color:var(--ink-2);border-left:3px solid var(--warn);padding:6px 10px;background:#FBF6EC;border-radius:0 4px 4px 0;margin-top:12px}
+.opp{border-left:3px solid var(--ok);background:#F0F7F1}
+
+/* filtro por ano de celebração */
+#yearbar{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.yb-lbl{font:600 .74rem 'Barlow Semi Condensed';text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2);white-space:nowrap}
+#year-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ychip{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:14px;padding:4px 12px;font:600 .78rem 'IBM Plex Sans';cursor:pointer;white-space:nowrap}
+.ychip small{font:400 .68rem var(--mono);color:var(--ink-2);margin-left:4px}
+.ychip:hover{border-color:var(--steel)}
+.ychip.on{background:var(--steel);border-color:var(--steel);color:#fff}
+.ychip.on small{color:#C9DAE6}
+.ychip.clear{background:none;border:none;color:var(--steel);text-decoration:underline;padding:4px 6px}
+.yb-scope{font:500 .7rem var(--mono);color:var(--ink-2);margin-left:auto}
+
+/* empresas problemáticas */
+.ep{display:grid;grid-template-columns:1fr auto auto;gap:14px;align-items:center;padding:11px 8px;border-bottom:1px solid var(--line);cursor:pointer}
+.ep:hover{background:var(--risk-soft)}
+.ep:focus-visible{outline:2px solid var(--risk)}
+.ep .who b{display:block;font-size:.9rem;font-weight:600}
+.ep .who small{font:400 .7rem var(--mono);color:var(--ink-2)}
+.ep .frase{font:600 .85rem 'IBM Plex Sans';color:var(--risk);background:var(--risk-soft);border:1px solid #E5C3BE;border-radius:12px;padding:4px 12px;white-space:nowrap}
+.ep .expo{text-align:right;font-size:.78rem;min-width:150px}
+.ep .expo b{display:block;font:700 .95rem 'Barlow Semi Condensed';color:var(--risk)}
+.ep .expo.zero b{color:var(--ink-2)}
+@media(max-width:760px){.ep{grid-template-columns:1fr;gap:6px}.ep .expo{text-align:left;min-width:0}}
+@media(max-width:700px){
+  .stake{grid-template-columns:26px 1fr 90px 48px}
+  .bar-row{grid-template-columns:120px 1fr 66px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hd-in">
+    <div class="brand">
+      <h1>Painel de Obras</h1>
+      <small>Alertas · risco · paralisações</small>
+    </div>
+    <nav id="nav">
+      <button data-s="geral" class="on">Visão geral</button>
+      <button data-s="alertas">Alertas</button>
+      <button data-s="paralisacoes">Paralisações</button>
+      <button data-s="contratadas">Contratadas</button>
+      <button data-s="obras">Obras</button>
+      <button data-s="config">⚙</button>
+    </nav>
+    <div id="src-badge"></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div id="loading">
+    <div class="spin"></div>
+    <div id="loadmsg">carregando dados…</div>
+  </div>
+
+  <div id="yearbar" style="display:none">
+    <span class="yb-lbl">Ano de celebração:</span>
+    <div id="year-chips"></div>
+  </div>
+
+  <!-- ============ VISÃO GERAL ============ -->
+  <section class="screen" id="s-geral">
+    <div class="kpis" id="kpis"></div>
+    <div class="grid2">
+      <div class="card">
+        <h2>Situação da carteira</h2>
+        <div class="sub">Distribuição das obras por status</div>
+        <div class="donut-wrap">
+          <svg id="donut" width="150" height="150" viewBox="0 0 42 42" role="img" aria-label="Distribuição das obras por status"></svg>
+          <div class="legend" id="donut-leg"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Obras que pedem atenção agora</h2>
+        <div class="sub">As com mais sinais de alerta — lista completa na aba Alertas</div>
+        <div id="top-alertas"></div>
+      </div>
+      <div class="card">
+        <h2>Onde os problemas se concentram — órgãos</h2>
+        <div class="sub">% das obras de cada órgão que terminaram canceladas, sem evolução ou paralisadas (mín. 30 ações)</div>
+        <div id="orgao-bars"></div>
+      </div>
+      <div class="card">
+        <h2>Onde os problemas se concentram — tipologias</h2>
+        <div class="sub">% de obras com problema por tipo (mín. 30 ações)</div>
+        <div id="tipo-bars"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ALERTAS ============ -->
+  <section class="screen" id="s-alertas">
+    <div class="kpis" id="al-kpis"></div>
+
+    <div class="card">
+      <h2>Obras contratadas com sinais de alerta</h2>
+      <div class="sub" id="al-count"></div>
+      <div class="filters">
+        <input id="al-search" type="search" placeholder="Buscar obra, município, empresa…">
+        <select id="al-lvl">
+          <option value="">Todos os níveis</option>
+          <option value="3">🔴 Crítico</option>
+          <option value="2">🟠 Alto</option>
+          <option value="1">🟡 Atenção</option>
+        </select>
+        <select id="al-orgao"><option value="">Órgão: todos</option></select>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Obra</th><th>Sinais de alerta</th><th>Valor a executar</th><th style="text-align:right">Nível</th></tr></thead>
+          <tbody id="al-body"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="al-prev">← Anterior</button>
+        <span id="al-page"></span>
+        <button id="al-next">Próxima →</button>
+      </div>
+      <div class="note" id="al-note"></div>
+    </div>
+
+    <div class="card">
+      <h2>Por que confiar nesses alertas</h2>
+      <div class="sub">Cada sinal foi testado contra as <b id="ev-n"></b> obras já encerradas da sua própria planilha: a barra mostra quantas das obras com aquele sinal terminaram mal. A linha preta é a média geral (<b id="ev-base"></b>) — barra à direita dela = sinal de perigo real.</div>
+      <div id="ev-bars"></div>
+    </div>
+  </section>
+
+  <!-- ============ PARALISAÇÕES ============ -->
+  <section class="screen" id="s-paralisacoes">
+    <div class="kpis" id="pa-kpis"></div>
+
+    <div class="card opp">
+      <h2>🎯 Quase prontas e paradas — as entregas mais fáceis</h2>
+      <div class="sub">Obras com 80%+ de execução que estão paradas. É onde pouco esforço destrava uma entrega inteira.</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Obra</th><th>Órgão</th><th>Executado</th><th>Falta pagar</th><th>Parada desde</th></tr></thead>
+          <tbody id="qp-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Todas as obras paradas agora</h2>
+      <div class="sub" id="po-count"></div>
+      <div class="filters">
+        <select id="po-orgao"><option value="">Órgão: todos</option></select>
+        <select id="po-sort">
+          <option value="dias">Ordenar: mais tempo parada</option>
+          <option value="valor">Ordenar: maior valor</option>
+          <option value="exec">Ordenar: mais adiantada</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Obra</th><th>Órgão</th><th>Exec.</th><th>Parada há</th><th>Motivo</th><th>Valor</th></tr></thead>
+          <tbody id="po-body"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="po-prev">← Anterior</button>
+        <span id="po-page"></span>
+        <button id="po-next">Próxima →</button>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h2>Por que as obras param</h2>
+        <div class="sub">Motivos categorizados · quanto tempo cada tipo costuma durar (mediana das já reiniciadas)</div>
+        <div id="motivo-bars"></div>
+      </div>
+      <div class="card">
+        <h2>Quando as obras param</h2>
+        <div class="sub">Paralisações por mês do ano, todo o histórico — planeje etapas críticas fora dos picos</div>
+        <div id="season-bars"></div>
+        <div class="note" id="dur-note"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CONTRATADAS ============ -->
+  <section class="screen" id="s-contratadas">
+    <div class="card" id="ep-card" style="border-top:3px solid var(--risk)">
+      <h2>🏢 Empresas problemáticas</h2>
+      <div class="sub" id="ep-sub"></div>
+      <div id="ep-rows"></div>
+    </div>
+    <div id="c-list" class="card">
+      <h2>Ranking de risco das contratadas</h2>
+      <div class="sub">Empresas com 5+ contratos, ordenadas pelo índice de risco (0–100). A faixa mostra a carteira: <span style="color:var(--ok)">■ concluída</span> · <span style="color:var(--steel)">■ em andamento</span> · <span style="color:var(--warn)">▨ paralisada/sem evolução</span> · <span style="color:var(--risk)">■ cancelada</span></div>
+      <div class="filters">
+        <input id="c-search" type="search" placeholder="Buscar empresa ou CNPJ…">
+        <select id="c-min">
+          <option value="5">Mín. 5 contratos</option>
+          <option value="10">Mín. 10 contratos</option>
+          <option value="30">Mín. 30 contratos</option>
+        </select>
+      </div>
+      <div id="c-rows"></div>
+      <div class="note">Índice de risco = 60 × taxa de contratos com problema (cancelado, sem evolução ou paralisado) + 40 × taxa histórica de paralisação. É triagem, não julgamento definitivo.</div>
+    </div>
+    <div id="c-detail" class="card">
+      <button class="back" id="c-back">← voltar ao ranking</button>
+      <div id="c-detail-body"></div>
+    </div>
+  </section>
+
+  <!-- ============ OBRAS ============ -->
+  <section class="screen" id="s-obras">
+    <div class="card">
+      <h2>Todas as obras</h2>
+      <div class="sub" id="o-count"></div>
+      <div class="filters">
+        <input id="o-search" type="search" placeholder="Buscar por nome, município, contratada…">
+        <select id="o-status"><option value="">Status: todos</option></select>
+        <select id="o-orgao"><option value="">Órgão: todos</option></select>
+        <select id="o-tipo"><option value="">Tipologia: todas</option></select>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>ID</th><th>Ação</th><th>Órgão</th><th>Status</th><th>Município</th><th>Exec.</th><th>Valor total</th></tr></thead>
+          <tbody id="o-body"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="o-prev">← Anterior</button>
+        <span id="o-page"></span>
+        <button id="o-next">Próxima →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CONFIG ============ -->
+  <section class="screen" id="s-config">
+    <div class="card cfg" style="max-width:640px">
+      <h2>Fonte de dados</h2>
+      <div class="sub">O painel busca os dados na API do Apps Script. Sem URL configurada, tenta um arquivo <code>data.json</code> na mesma pasta.</div>
+      <label for="cfg-url">URL do Web App (Apps Script)</label>
+      <input id="cfg-url" type="url" placeholder="https://script.google.com/macros/s/…/exec">
+      <button id="cfg-save">Salvar e recarregar</button>
+      <div class="hint">A URL fica salva só neste navegador (localStorage). Cada pessoa da equipe configura uma vez.</div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ============================================================
+   CARGA E NORMALIZAÇÃO
+   ============================================================ */
+const LS_KEY = 'obras_api_url';
+const HOJE = new Date();
+let RAW = [];                       // todas as obras do escopo (sem filtro de ano)
+let DATA = [], CONTR = [], ALERTAS = [], EVID = null;
+const YEAR_SEL = new Set();         // anos marcados; vazio = todos
+
+const fmtBRL = v => v >= 1e9 ? 'R$ '+(v/1e9).toFixed(2)+' bi'
+              : v >= 1e6 ? 'R$ '+(v/1e6).toFixed(1)+' mi'
+              : v >= 1e3 ? 'R$ '+(v/1e3).toFixed(0)+' mil'
+              : 'R$ '+v.toFixed(0);
+const fmtN = v => v.toLocaleString('pt-BR');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function parseDate(s){
+  if (!s) return null;
+  s = String(s);
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  return null;
+}
+function brDate(s){
+  if (!s || /^[\s\-–—]*$/.test(String(s))) return '';
+  const d = parseDate(s);
+  if (!d) return String(s).trim();
+  return String(d.getDate()).padStart(2,'0') + '/' +
+         String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+}
+const anosDesde = d => (HOJE - d) / 3.156e10;
+function tempoTxt(anos){
+  if (anos < 1) return Math.round(anos*12) + ' meses';
+  return anos.toFixed(1).replace('.',',') + ' anos';
+}
+
+function normalize(raw){
+  const money = v => {
+    if (typeof v === 'number') return v;
+    if (!v || v === '-') return 0;
+    const n = parseFloat(String(v).replace(/R\$|\./g,'').replace(',','.'));
+    return isNaN(n) ? 0 : n;
+  };
+  const pctv = v => {
+    if (typeof v === 'number') return v;
+    if (!v || v === '-') return null;
+    const n = parseFloat(String(v).replace('%','').replace(',','.'));
+    return isNaN(n) ? null : n;
+  };
+  const cl = v => (v == null || /^[\s\-–—]*$/.test(String(v))) ? '' : String(v).trim();
+  return raw.map(r => {
+    if ('n' in r && 's' in r) return r;
+    const contr = cl(r['Nome do Contratado']);
+    let cj = '', c = contr;
+    const m = contr.match(/^(\d{8,14})\s*-\s*(.+)$/);
+    if (m) { cj = m[1]; c = m[2].trim(); }
+    return {
+      id: cl(r['ID da Ação']), n: cl(r['Nome da Ação']), o: cl(r['Órgão da Ação']),
+      s: cl(r['Status']), p: pctv(r['Percentual de Execução da Ação']),
+      t: cl(r['TIPOLOGIA']), cl: cl(r['CLASSIFICAÇÃO']), m: cl(r['Localização (Município)']),
+      dc: cl(r['Data da celebração']),
+      vt: money(r['Valor Total']), vp: money(r['Valor pago total']),
+      dp: cl(r['Data da Última Paralisação']), dr: cl(r['Data de reinício da Última Paralisação']),
+      mo: cl(r['Motivo da Paralisação']), cj, c
+    };
+  }).map(r => { r.dp = brDate(r.dp); r.dr = brDate(r.dr); r.dc = brDate(r.dc); return r; })
+  /* escopo da análise: somente CLASSIFICAÇÃO = OBRA e sem
+     referência a convênio no nome da ação (CONVÊNIO, CONV) */
+    .filter(r => (!r.cl || r.cl.toUpperCase() === 'OBRA') &&
+                 !/CONV[EÊ]NIO|\bCONV\b/i.test(r.n));
+}
+
+async function load(){
+  const url = localStorage.getItem(LS_KEY);
+  const src = url ? url + (url.includes('?') ? '&' : '?') + 'action=read' : 'data.json';
+  document.getElementById('loadmsg').textContent = 'carregando de ' + (url ? 'Apps Script' : 'data.json') + '…';
+  try{
+    const res = await fetch(src);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    RAW = normalize(Array.isArray(json) ? json : (json.rows || json.data || []));
+    if (!RAW.length) throw new Error('resposta vazia');
+    buildYearBar();
+    applyYearFilter();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('yearbar').style.display = 'flex';
+    show(location.hash.replace('#','') || 'geral');
+  }catch(e){
+    document.getElementById('loadmsg').innerHTML =
+      'Não consegui carregar os dados (' + esc(e.message) + ').<br>Verifique a URL da API na aba ⚙ Config.';
+  }
+}
+
+/* ============================================================
+   FILTRO POR ANO DE CELEBRAÇÃO
+   Chips marcáveis; vazio = todos os anos. Recalcula TODA a
+   análise (alertas, empresas, paralisações) só com as obras
+   celebradas nos anos marcados.
+   ============================================================ */
+const celYear = r => { const d = parseDate(r.dc); return d ? d.getFullYear() : null; };
+
+function buildYearBar(){
+  const counts = new Map();
+  let semData = 0;
+  for (const r of RAW){
+    const y = celYear(r);
+    if (y == null) semData++;
+    else counts.set(y, (counts.get(y)||0)+1);
+  }
+  const years = [...counts.keys()].sort((a,b)=>b-a);
+  const el = document.getElementById('year-chips');
+  el.innerHTML =
+    years.map(y => `<button class="ychip" data-y="${y}">${y}<small>${fmtN(counts.get(y))}</small></button>`).join('') +
+    (semData ? `<button class="ychip" data-y="sem">Sem data<small>${fmtN(semData)}</small></button>` : '') +
+    `<button class="ychip clear" data-y="__clear" style="display:none">limpar</button>` +
+    `<span class="yb-scope" id="yb-scope"></span>`;
+  el.addEventListener('click', e => {
+    const b = e.target.closest('.ychip'); if (!b) return;
+    const y = b.dataset.y;
+    if (y === '__clear') YEAR_SEL.clear();
+    else {
+      const key = y === 'sem' ? 'sem' : +y;
+      YEAR_SEL.has(key) ? YEAR_SEL.delete(key) : YEAR_SEL.add(key);
+    }
+    applyYearFilter();
+  });
+}
+
+function applyYearFilter(){
+  DATA = YEAR_SEL.size
+    ? RAW.filter(r => {
+        const y = celYear(r);
+        return y == null ? YEAR_SEL.has('sem') : YEAR_SEL.has(y);
+      })
+    : RAW;
+  // estado visual dos chips
+  document.querySelectorAll('.ychip').forEach(b => {
+    if (b.dataset.y === '__clear'){ b.style.display = YEAR_SEL.size ? '' : 'none'; return; }
+    const key = b.dataset.y === 'sem' ? 'sem' : +b.dataset.y;
+    b.classList.toggle('on', YEAR_SEL.has(key));
+  });
+  const sc = document.getElementById('yb-scope');
+  if (sc) sc.textContent = YEAR_SEL.size
+    ? fmtN(DATA.length) + ' de ' + fmtN(RAW.length) + ' obras no recorte'
+    : 'todos os anos · ' + fmtN(RAW.length) + ' obras';
+  document.getElementById('src-badge').textContent =
+    (localStorage.getItem(LS_KEY) ? 'fonte: apps script' : 'fonte: data.json') +
+    ' · ' + fmtN(DATA.length) + ' obras (sem convênios)';
+  buildAll();
+}
+
+/* ============================================================
+   CLASSIFICAÇÃO
+   ============================================================ */
+const isProblem = r => ['Cancelado','Sem Evolução','Paralisado Com Termo'].includes(r.s);
+const isOngoing = r => ['Em desenvolvimento','Em aberto'].includes(r.s);
+const isDone    = r => r.s === 'Concluído';
+/* parada agora = status oficial OU paralisação sem reinício válido em obra ativa */
+const isStopped = r => r.s === 'Paralisado Com Termo' ||
+  (!!r.dp && !parseDate(r.dr) && !isDone(r) && r.s !== 'Cancelado');
+const payGap = r => (r.vt > 0 && r.p != null) ? (r.vp/r.vt - r.p/100) : 0;
+
+const MOTIVO_CATS = [
+  ['Clima / chuvas', /CHUVA|INVERNO|CLIM[ÁA]T|PLUVIO/i],
+  ['Financeiro / pagamento', /FINANC|PAGAMENT|RECURSO|OR[ÇC]AMENT|REPASSE|INADIMPL|MEDI[ÇC][ÃA]O/i],
+  ['Abandono da empresa', /ABANDON|DESIST|EMPRESA (N[ÃA]O|PAROU|AUSENTE)/i],
+  ['Projeto / readequação', /PROJETO|READEQUA|REVIS[ÃA]O|ADITIVO|ALTERA[ÇC]/i],
+  ['Contratual / jurídico', /RESCIS|JUDICI|LICITA|CONTRAT|TCE|JUSTI[ÇC]A|MINIST[ÉE]RIO/i],
+  ['Material / fornecimento', /MATERIA|FORNEC|INSUMO|EQUIPAMENTO/i],
+];
+function motivoCat(mo){
+  for (const [name, rx] of MOTIVO_CATS) if (rx.test(mo)) return name;
+  return 'Outros / não detalhado';
+}
+
+/* ============================================================
+   HISTÓRICO DAS EMPRESAS (taxa suavizada)
+   ============================================================ */
+const EMP = { base: 0.2, map: new Map() };
+function buildEmpHistory(){
+  /* histórico completo (RAW): a reputação da empresa não depende
+     do filtro de ano — ele define quais obras analisar, não o passado */
+  const fin = RAW.filter(r => isDone(r) || isProblem(r));
+  EMP.fin = fin;
+  EMP.base = fin.length ? fin.filter(isProblem).length / fin.length : 0.2;
+  EMP.map.clear();
+  for (const r of fin){
+    const k = r.cj || r.c; if (!k) continue;
+    if (!EMP.map.has(k)) EMP.map.set(k, {n:0, p:0});
+    const o = EMP.map.get(k); o.n++; if (isProblem(r)) o.p++;
+  }
+}
+function empRate(key){
+  const o = EMP.map.get(key);
+  return o ? { rate: (o.p + 8*EMP.base)/(o.n + 8), n: o.n, p: o.p } : null;
+}
+
+/* ============================================================
+   SISTEMA DE ALERTAS — sinais concretos por obra
+   ------------------------------------------------------------
+   Cada sinal é observável e explicável em uma frase.
+   Pesos: sinais fortes (validados com alta taxa de problema no
+   histórico) valem 3; moderados 2; leves 1.
+   Nível: 3+ pontos = Crítico · 2 = Alto · 1 = Atenção
+   ============================================================ */
+function obraAlertas(r){
+  const f = [];        // {txt, sev:'bad'|'mid'|'good', pts}
+  const gap = payGap(r);
+  const e = r.c ? empRate(r.cj || r.c) : null;
+  const dCel = parseDate(r.dc);
+  const idade = dCel ? anosDesde(dCel) : null;
+  const dStop = parseDate(r.dp);
+
+  // ⏸ parada sem reinício
+  if (r.dp && !parseDate(r.dr)){
+    const t = dStop ? ' há ' + tempoTxt(anosDesde(dStop)) : '';
+    f.push({txt:'⏸ Parada' + t + ' sem reinício', sev:'bad', pts:3});
+  }
+  // 🏢 empresa com histórico ruim
+  if (e && e.n >= 5 && e.rate >= 0.35){
+    f.push({txt:'🏢 Empresa problemática: ' + e.p + ' de ' + e.n + ' contratos deram problema', sev:'bad', pts:3});
+  }
+  // 💰 pagamento adiantado
+  if (gap > 0.30){
+    f.push({txt:'💰 Pagou ' + Math.round(r.vp/r.vt*100) + '%, executou ' + Math.round(r.p) + '%', sev:'bad', pts:2});
+  } else if (gap > 0.15){
+    f.push({txt:'💰 Pagamento adiantado: +' + Math.round(gap*100) + ' pts sobre a execução', sev:'mid', pts:1});
+  }
+  // 📄 nunca saiu do papel
+  if (idade != null && idade >= 2 && (r.p == null || r.p <= 5) && r.vp === 0){
+    f.push({txt:'📄 Contrato de ' + tempoTxt(idade) + ' sem nada executado nem pago', sev:'bad', pts:2});
+  }
+  // 🐌 ritmo lento → projeção de término
+  if (idade != null && idade >= 1.5 && r.p != null && r.p > 5 && r.p < 95 && !(r.dp && !parseDate(r.dr))){
+    const ritmo = r.p / idade;                      // pontos de execução por ano
+    if (ritmo < 15){
+      const anosFaltam = (100 - r.p) / ritmo;
+      const anoFim = HOJE.getFullYear() + Math.round(anosFaltam);
+      f.push({txt:'🐌 Ritmo lento: ' + Math.round(ritmo) + ' pts/ano — neste ritmo conclui em ' + (anoFim > HOJE.getFullYear()+15 ? 'décadas' : anoFim), sev:'mid', pts:1});
+    }
+  }
+  // 📅 contrato antigo ainda rodando
+  if (idade != null && idade >= 5 && (r.p == null || r.p < 95)){
+    f.push({txt:'📅 Contrato de ' + (dCel.getFullYear()) + ' (' + tempoTxt(idade) + ') ainda em execução', sev:'mid', pts:1});
+  }
+  // sinais positivos (não pontuam, só informam)
+  if (r.dp && parseDate(r.dr)){
+    f.push({txt:'↩ Já parou e retomou — historicamente essas terminam bem', sev:'good', pts:0});
+  }
+  if (e && e.n >= 5 && e.rate < 0.15 && !f.some(x=>x.sev==='bad')){
+    f.push({txt:'✓ Empresa com bom histórico (' + e.n + ' contratos)', sev:'good', pts:0});
+  }
+  const pts = f.reduce((a,x)=>a+x.pts,0);
+  return { f, pts, lvl: pts >= 3 ? 3 : pts };   // 3=crítico 2=alto 1=atenção 0=ok
+}
+
+function buildAlertas(){
+  ALERTAS = DATA.filter(r => isOngoing(r) && (r.c || r.dc || r.dp))
+    .map(r => ({r, ...obraAlertas(r)}))
+    .filter(x => x.pts > 0)
+    .sort((a,b) => b.pts - a.pts || (b.r.vt-b.r.vp) - (a.r.vt-a.r.vp));
+}
+
+/* evidência: taxa de problema histórica de cada sinal */
+function buildEvidencia(){
+  const fin = EMP.fin;
+  const rate = set => set.length ? set.filter(isProblem).length/set.length : null;
+  const mk = (l, set, cls) => ({l, n:set.length, v:rate(set), cls});
+  EVID = {
+    base: rate(fin),
+    n: fin.length,
+    itens: [
+      mk('🏢 Empresa problemática (≥35%)', fin.filter(r=>{const e=r.c&&empRate(r.cj||r.c);return e&&e.n>=5&&e.rate>=0.35;}), 'r'),
+      mk('⏸ Parou e não reiniciou', fin.filter(r=>r.dp&&!parseDate(r.dr)), 'r'),
+      mk('💰 Pagamento adiantado (+15 pts)', fin.filter(r=>r.p!=null&&r.p<100&&payGap(r)>0.15), 'w'),
+      mk('↩ Parou mas reiniciou', fin.filter(r=>r.dp&&parseDate(r.dr)), 'g'),
+      mk('✓ Empresa com bom histórico (<15%)', fin.filter(r=>{const e=r.c&&empRate(r.cj||r.c);return e&&e.n>=5&&e.rate<0.15;}), 'g'),
+    ].filter(i=>i.v!=null)
+  };
+}
+
+/* ============================================================
+   CONTRATADAS (agregado)
+   ============================================================ */
+function buildContractors(){
+  const map = new Map();
+  for (const r of DATA){
+    if (!r.c) continue;
+    const key = r.cj || r.c;
+    if (!map.has(key)) map.set(key, {key, name:r.c, cnpj:r.cj, rows:[]});
+    map.get(key).rows.push(r);
+  }
+  CONTR = [...map.values()].map(c => {
+    const n = c.rows.length;
+    const done = c.rows.filter(isDone).length;
+    const ong  = c.rows.filter(isOngoing).length;
+    const can  = c.rows.filter(r => r.s === 'Cancelado').length;
+    const parS = c.rows.filter(r => ['Sem Evolução','Paralisado Com Termo'].includes(r.s)).length;
+    const prob = c.rows.filter(isProblem).length;
+    const stops= c.rows.filter(r => r.dp).length;
+    const vt   = c.rows.reduce((a,r)=>a+r.vt,0);
+    const vRisk= c.rows.filter(r => isProblem(r)||isStopped(r)).reduce((a,r)=>a+r.vt,0);
+    const score= Math.round(60*(prob/n) + 40*(stops/n));
+    return {...c, n, done, ong, can, parS, prob, stops, vt, vRisk, score};
+  }).sort((a,b)=> b.score - a.score || b.n - a.n);
+}
+
+/* ============================================================
+   COMPONENTES
+   ============================================================ */
+function bars(el, items, cls, baseFrac){
+  const max = Math.max(...items.map(i=>i.v), baseFrac||0, 0.0001);
+  el.innerHTML = items.map(i => `
+    <div class="bar-row">
+      <div class="lbl" title="${esc(i.l)}">${esc(i.l)}</div>
+      <div class="bar-track">
+        <div class="bar-fill ${i.c||cls||''}" style="width:${(i.v/max*100).toFixed(1)}%"></div>
+        ${baseFrac!=null?`<div class="base-mark" style="left:${(baseFrac/max*100).toFixed(1)}%"></div>`:''}
+      </div>
+      <div class="val">${i.txt ?? fmtN(i.v)}</div>
+    </div>`).join('');
+}
+
+function donut(el, legEl, parts){
+  const total = parts.reduce((a,p)=>a+p.v,0);
+  let off = 25, svg = '';
+  for (const p of parts){
+    const frac = p.v/total*100;
+    svg += `<circle cx="21" cy="21" r="15.9" fill="none" stroke="${p.col}" stroke-width="6"
+      stroke-dasharray="${frac.toFixed(2)} ${(100-frac).toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}"></circle>`;
+    off -= frac;
+  }
+  el.innerHTML = svg + `<text x="21" y="20" text-anchor="middle" font-size="6.5" font-weight="700" font-family="Barlow Semi Condensed">${fmtN(total)}</text>
+    <text x="21" y="26.5" text-anchor="middle" font-size="3" fill="#5A6572">obras</text>`;
+  legEl.innerHTML = parts.map(p =>
+    `<div><i style="background:${p.col}"></i>${esc(p.l)} — <b>${fmtN(p.v)}</b> (${(p.v/total*100).toFixed(1)}%)</div>`).join('');
+}
+
+const lvlTag = lvl =>
+  lvl >= 3 ? '<span class="lvl crit">Crítico</span>' :
+  lvl === 2 ? '<span class="lvl alto">Alto</span>' :
+  '<span class="lvl aten">Atenção</span>';
+
+const alChips = f => f.map(x=>`<span class="al ${x.sev}">${esc(x.txt)}</span>`).join(' ');
+
+function resetSelect(el){
+  if (el && el.options) while (el.options.length > 1) el.remove(1);
+}
+function statusTag(s){
+  const cls = s==='Concluído'?'t-ok': s==='Cancelado'?'t-can':
+    ['Sem Evolução','Paralisado Com Termo'].includes(s)?'t-par':
+    ['Em desenvolvimento','Em aberto'].includes(s)?'t-and':'t-neu';
+  return `<span class="tag ${cls}">${esc(s)}</span>`;
+}
+
+/* ============================================================
+   TELA: VISÃO GERAL
+   ============================================================ */
+function buildGeral(){
+  const total = DATA.length;
+  const prob = DATA.filter(isProblem).length;
+  const stopped = DATA.filter(isStopped).length;
+  const vRisk = DATA.filter(r => isProblem(r)||isStopped(r)).reduce((a,r)=>a+r.vt,0);
+  const vTot  = DATA.reduce((a,r)=>a+r.vt,0);
+  const crit = ALERTAS.filter(x=>x.lvl>=3).length;
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><b>${fmtN(total)}</b><span>obras na carteira</span></div>
+    <div class="kpi ok"><b>${fmtN(DATA.filter(isDone).length)}</b><span>concluídas</span></div>
+    <div class="kpi"><b>${fmtN(DATA.filter(isOngoing).length)}</b><span>em andamento</span></div>
+    <div class="kpi warn"><b>${fmtN(stopped)}</b><span>paradas agora</span></div>
+    <div class="kpi risk"><b>${fmtN(crit)}</b><span>em andamento com alerta crítico</span></div>
+    <div class="kpi risk"><b>${fmtBRL(vRisk)}</b><span>valor em risco / ${fmtBRL(vTot)} total</span></div>`;
+
+  const st = {};
+  DATA.forEach(r => st[r.s] = (st[r.s]||0)+1);
+  const COLS = {'Concluído':'#3E7C4F','Em desenvolvimento':'#2E5E7E','Em aberto':'#7FA3BC',
+    'Cancelado':'#B3382C','Sem Evolução':'#C98A1B','Paralisado Com Termo':'#8A5E10'};
+  donut(document.getElementById('donut'), document.getElementById('donut-leg'),
+    Object.entries(st).sort((a,b)=>b[1]-a[1]).map(([l,v])=>({l,v,col:COLS[l]||'#999'})));
+
+  const rateBars = (keyFn, el) => {
+    const agg = {};
+    DATA.forEach(r => { const k = keyFn(r); if(!k) return;
+      agg[k] = agg[k]||{t:0,p:0}; agg[k].t++; if(isProblem(r)) agg[k].p++; });
+    bars(el, Object.entries(agg).filter(([,v])=>v.t>=30)
+      .map(([l,v])=>({l, v:v.p/v.t, txt:(v.p/v.t*100).toFixed(1)+'% ('+v.p+')', c: v.p/v.t>0.25?'r':v.p/v.t>0.15?'w':''}))
+      .sort((a,b)=>b.v-a.v).slice(0,10));
+  };
+  rateBars(r=>r.o, document.getElementById('orgao-bars'));
+  rateBars(r=>r.t, document.getElementById('tipo-bars'));
+
+  document.getElementById('top-alertas').innerHTML = ALERTAS.slice(0,6).map(x => `
+    <div style="padding:8px 0;border-bottom:1px solid var(--line)">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">
+        <div style="font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(x.r.n)}">${esc(x.r.n)}</div>
+        ${lvlTag(x.lvl)}
+      </div>
+      <div style="font:400 .7rem var(--mono);color:var(--ink-2);margin:1px 0 4px">${esc(x.r.o)} · ${esc(x.r.m)||'—'}</div>
+      <div>${alChips(x.f.filter(y=>y.sev!=='good').slice(0,2))}</div>
+    </div>`).join('') || '<div class="sub">Nenhuma obra em andamento com alertas. 🎉</div>';
+}
+
+/* ============================================================
+   TELA: ALERTAS
+   ============================================================ */
+let alPage = 0; const AL_PER = 25;
+function buildAlertasTela(){
+  const contratadas = DATA.filter(r => isOngoing(r) && (r.c || r.dc)).length;
+  const crit = ALERTAS.filter(x=>x.lvl>=3);
+  const alto = ALERTAS.filter(x=>x.lvl===2);
+  const vExp = [...crit,...alto].reduce((a,x)=>a+Math.max(x.r.vt-x.r.vp,0),0);
+  document.getElementById('al-kpis').innerHTML = `
+    <div class="kpi"><b>${fmtN(contratadas)}</b><span>obras contratadas em execução</span></div>
+    <div class="kpi warn"><b>${fmtN(ALERTAS.length)}</b><span>com pelo menos 1 alerta</span></div>
+    <div class="kpi risk"><b>${fmtN(crit.length)}</b><span>🔴 nível crítico</span></div>
+    <div class="kpi warn"><b>${fmtN(alto.length)}</b><span>🟠 nível alto</span></div>
+    <div class="kpi risk"><b>${fmtBRL(vExp)}</b><span>a executar nas críticas + altas</span></div>`;
+
+  const semContrato = DATA.filter(r => isOngoing(r) && !r.c && !r.dc).length;
+  document.getElementById('al-note').innerHTML =
+    `${fmtN(semContrato)} obras em andamento ainda não têm contrato/execução registrada na planilha e ficam fora destes alertas — elas estão em fase anterior (projeto, licitação). Ações de convênio e de outras classificações ficam fora de toda a análise.`;
+
+  document.getElementById('ev-n').textContent = fmtN(EVID.n);
+  document.getElementById('ev-base').textContent = (EVID.base*100).toFixed(0)+'%';
+  bars(document.getElementById('ev-bars'),
+    EVID.itens.map(i=>({l:i.l, v:i.v, txt:(i.v*100).toFixed(0)+'% de '+fmtN(i.n), c:i.cls})),
+    null, EVID.base);
+
+  const fill = document.getElementById('al-orgao');
+  resetSelect(fill);
+  [...new Set(ALERTAS.map(x=>x.r.o).filter(Boolean))].sort().forEach(v => {
+    const o = document.createElement('option'); o.value = o.textContent = v; fill.appendChild(o);
+  });
+  renderAlertas();
+}
+function alFiltered(){
+  const q = document.getElementById('al-search').value.toLowerCase();
+  const lvl = document.getElementById('al-lvl').value;
+  const og = document.getElementById('al-orgao').value;
+  return ALERTAS.filter(x =>
+    (!lvl || x.lvl === +lvl) && (!og || x.r.o === og) &&
+    (!q || x.r.n.toLowerCase().includes(q) || x.r.m.toLowerCase().includes(q) || x.r.c.toLowerCase().includes(q)));
+}
+function renderAlertas(){
+  const list = alFiltered();
+  const pages = Math.max(1, Math.ceil(list.length/AL_PER));
+  alPage = Math.min(alPage, pages-1);
+  document.getElementById('al-count').textContent =
+    fmtN(list.length)+' obras com sinais de alerta — os sinais em vermelho e laranja indicam risco; os verdes, pontos a favor.';
+  document.getElementById('al-body').innerHTML = list.slice(alPage*AL_PER,(alPage+1)*AL_PER).map(x => `
+    <tr>
+      <td style="min-width:220px">${esc(x.r.n)}
+        <div style="font:400 .68rem var(--mono);color:var(--ink-2)">${esc(x.r.o)} · ${esc(x.r.m)||'—'}${x.r.c?' · '+esc(x.r.c):''}${x.r.p!=null?' · exec. '+Math.round(x.r.p)+'%':''}</div>
+      </td>
+      <td style="min-width:260px">${alChips(x.f)}</td>
+      <td class="num">${fmtBRL(Math.max(x.r.vt - x.r.vp, 0))}</td>
+      <td style="text-align:right">${lvlTag(x.lvl)}</td>
+    </tr>`).join('') || '<tr><td colspan="4" class="sub">Nenhuma obra encontrada com esses filtros.</td></tr>';
+  document.getElementById('al-page').textContent = (alPage+1)+' / '+pages;
+  document.getElementById('al-prev').disabled = alPage===0;
+  document.getElementById('al-next').disabled = alPage>=pages-1;
+}
+
+/* ============================================================
+   TELA: PARALISAÇÕES
+   ============================================================ */
+let poPage = 0; const PO_PER = 25;
+let PARADAS = [];
+function buildParalisacoes(){
+  PARADAS = DATA.filter(isStopped).map(r => {
+    const d = parseDate(r.dp);
+    return {r, dias: d ? Math.round((HOJE-d)/864e5) : null};
+  });
+  const vPreso = PARADAS.reduce((a,x)=>a+Math.max(x.r.vt-x.r.vp,0),0);
+  const comDias = PARADAS.filter(x=>x.dias!=null).map(x=>x.dias).sort((a,b)=>a-b);
+  const medDias = comDias[Math.floor(comDias.length/2)] || 0;
+  const quase = PARADAS.filter(x=>x.r.p!=null&&x.r.p>=80);
+  const vQuase = quase.reduce((a,x)=>a+Math.max(x.r.vt-x.r.vp,0),0);
+  document.getElementById('pa-kpis').innerHTML = `
+    <div class="kpi warn"><b>${fmtN(PARADAS.length)}</b><span>obras paradas agora</span></div>
+    <div class="kpi warn"><b>${medDias>=365?tempoTxt(medDias/365):medDias+' dias'}</b><span>tempo mediano parada</span></div>
+    <div class="kpi risk"><b>${fmtBRL(vPreso)}</b><span>valor preso nas paradas</span></div>
+    <div class="kpi ok"><b>${fmtN(quase.length)}</b><span>quase prontas (80%+) — ${fmtBRL(vQuase)} destravam</span></div>`;
+
+  // quase prontas
+  document.getElementById('qp-body').innerHTML = [...quase]
+    .sort((a,b)=>b.r.p-a.r.p).slice(0,15).map(x => `
+    <tr>
+      <td>${esc(x.r.n)}<div style="font:400 .68rem var(--mono);color:var(--ink-2)">${esc(x.r.m)||''}${x.r.c?' · '+esc(x.r.c):''}</div></td>
+      <td>${esc(x.r.o)}</td>
+      <td class="num" style="color:var(--ok);font-weight:600">${Math.round(x.r.p)}%</td>
+      <td class="num">${fmtBRL(Math.max(x.r.vt-x.r.vp,0))}</td>
+      <td class="num">${esc(x.r.dp)||'—'}</td>
+    </tr>`).join('');
+
+  // motivos com duração mediana
+  const stops = DATA.filter(r=>r.dp);
+  const cats = {};
+  stops.forEach(r => {
+    const c = motivoCat(r.mo);
+    cats[c] = cats[c] || {n:0, dur:[]};
+    cats[c].n++;
+    const a = parseDate(r.dp), b = parseDate(r.dr);
+    if (a && b && b > a) cats[c].dur.push((b-a)/864e5);
+  });
+  const median = arr => { const s=[...arr].sort((x,y)=>x-y); return s[Math.floor(s.length/2)]||0; };
+  bars(document.getElementById('motivo-bars'),
+    Object.entries(cats).map(([l,v])=>({
+      l, v:v.n,
+      txt: fmtN(v.n) + (v.dur.length>=10 ? ' · ~'+Math.round(median(v.dur))+'d' : '')
+    })).sort((a,b)=>b.v-a.v), 'w');
+
+  // sazonalidade
+  const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const byMonth = Array(12).fill(0);
+  DATA.forEach(r => { const d = parseDate(r.dp); if (d) byMonth[d.getMonth()]++; });
+  const mMax = Math.max(...byMonth, 1);
+  bars(document.getElementById('season-bars'),
+    byMonth.map((v,i)=>({l:MESES[i], v, c: v > mMax*0.8 ? 'w' : ''})));
+
+  const allDur = [];
+  stops.forEach(r => { const a=parseDate(r.dp), b=parseDate(r.dr); if(a&&b&&b>a) allDur.push((b-a)/864e5); });
+  document.getElementById('dur-note').innerHTML =
+    `Das paralisações que já terminaram (${fmtN(allDur.length)}), a mediana foi de <b>${Math.round(median(allDur))} dias parada</b>. Cada paralisação evitada vale meses de cronograma.`;
+
+  const fill = document.getElementById('po-orgao');
+  resetSelect(fill);
+  [...new Set(PARADAS.map(x=>x.r.o).filter(Boolean))].sort().forEach(v => {
+    const o = document.createElement('option'); o.value = o.textContent = v; fill.appendChild(o);
+  });
+  renderParadas();
+}
+function renderParadas(){
+  const og = document.getElementById('po-orgao').value;
+  const sort = document.getElementById('po-sort').value;
+  let list = PARADAS.filter(x => !og || x.r.o === og);
+  if (sort === 'valor') list = [...list].sort((a,b)=>b.r.vt-a.r.vt);
+  else if (sort === 'exec') list = [...list].sort((a,b)=>(b.r.p||0)-(a.r.p||0));
+  else list = [...list].sort((a,b)=>(b.dias||0)-(a.dias||0));
+  const pages = Math.max(1, Math.ceil(list.length/PO_PER));
+  poPage = Math.min(poPage, pages-1);
+  document.getElementById('po-count').textContent =
+    fmtN(list.length)+' obras — inclui todas com status "Paralisado Com Termo" e as ativas com paralisação sem data de reinício';
+  document.getElementById('po-body').innerHTML = list.slice(poPage*PO_PER,(poPage+1)*PO_PER).map(x => `
+    <tr>
+      <td>${esc(x.r.n)}<div style="font:400 .68rem var(--mono);color:var(--ink-2)">${esc(x.r.m)||''}${x.r.c?' · '+esc(x.r.c):''}</div></td>
+      <td>${esc(x.r.o)}</td>
+      <td class="num">${x.r.p==null?'—':Math.round(x.r.p)+'%'}</td>
+      <td class="num" style="${x.dias>730?'color:var(--risk);font-weight:600':''}">${x.dias==null?'—':x.dias>=365?tempoTxt(x.dias/365):x.dias+' dias'}</td>
+      <td style="font-size:.74rem">${esc(motivoCat(x.r.mo))}</td>
+      <td class="num">${x.r.vt?fmtBRL(x.r.vt):'—'}</td>
+    </tr>`).join('');
+  document.getElementById('po-page').textContent = (poPage+1)+' / '+pages;
+  document.getElementById('po-prev').disabled = poPage===0;
+  document.getElementById('po-next').disabled = poPage>=pages-1;
+}
+
+/* ============================================================
+   EMPRESAS PROBLEMÁTICAS — campo dedicado
+   Critério (o mesmo do alerta 🏢): 5+ contratos já encerrados
+   e taxa de problema suavizada ≥ 35%. Ordenadas por quanto
+   ainda têm em obras ativas — onde a informação vira ação.
+   ============================================================ */
+function buildEmpProb(){
+  const list = CONTR.map(c => {
+    const e = empRate(c.key);
+    if (!e || e.n < 5 || e.rate < 0.35) return null;
+    const ativas = c.rows.filter(isOngoing);
+    const vAtivo = ativas.reduce((a,r)=>a+Math.max(r.vt-r.vp,0),0);
+    return {c, e, nAtivas: ativas.length, vAtivo};
+  }).filter(Boolean)
+    .sort((a,b) => b.vAtivo - a.vAtivo || b.nAtivas - a.nAtivas || b.e.rate - a.e.rate);
+
+  const comAtivas = list.filter(x=>x.nAtivas>0);
+  const vTotal = comAtivas.reduce((a,x)=>a+x.vAtivo,0);
+  document.getElementById('ep-sub').innerHTML =
+    `Empresas em que <b>pelo menos 35% dos contratos já encerrados deram problema</b> (mín. 5 contratos). ` +
+    `No histórico, obras dessas empresas terminaram mal em <b>${(EVID.itens[0].v*100).toFixed(0)}%</b> dos casos. ` +
+    (comAtivas.length
+      ? `<span style="color:var(--risk)"><b>${comAtivas.length}</b> delas ainda têm obras ativas — <b>${fmtBRL(vTotal)}</b> a executar sob risco.</span>`
+      : 'Nenhuma delas tem obras ativas no momento.');
+
+  document.getElementById('ep-rows').innerHTML = list.map(x => `
+    <div class="ep" tabindex="0" role="button" data-k="${esc(x.c.key)}">
+      <div class="who">
+        <b>${esc(x.c.name)}</b>
+        <small>${x.c.cnpj?'CNPJ '+esc(x.c.cnpj)+' · ':''}${fmtBRL(x.c.vt)} contratados no total</small>
+      </div>
+      <div class="frase">${x.e.p} de ${x.e.n} contratos deram problema</div>
+      <div class="expo ${x.nAtivas? '':'zero'}">
+        ${x.nAtivas
+          ? `<b>${x.nAtivas} obra${x.nAtivas>1?'s':''} ativa${x.nAtivas>1?'s':''} agora</b>${fmtBRL(x.vAtivo)} a executar`
+          : `<b>sem obras ativas</b>histórico apenas`}
+      </div>
+    </div>`).join('') || '<div class="sub" style="padding:14px 0">Nenhuma empresa se encaixa no critério. 🎉</div>';
+
+  document.querySelectorAll('.ep').forEach(el => {
+    el.addEventListener('click', () => { showContr(el.dataset.k); });
+    el.addEventListener('keydown', e => { if(e.key==='Enter') showContr(el.dataset.k); });
+  });
+}
+
+/* ============================================================
+   TELA: CONTRATADAS
+   ============================================================ */
+function renderContr(){
+  const q = document.getElementById('c-search').value.toLowerCase();
+  const min = +document.getElementById('c-min').value;
+  const list = CONTR.filter(c => c.n >= min &&
+    (!q || c.name.toLowerCase().includes(q) || c.cnpj.includes(q))).slice(0,60);
+  document.getElementById('c-rows').innerHTML = list.map((c,i) => `
+    <div class="stake" tabindex="0" role="button" data-k="${esc(c.key)}">
+      <div class="pos">${String(i+1).padStart(2,'0')}</div>
+      <div class="who"><b title="${esc(c.name)}">${esc(c.name)}</b><small>${c.cnpj?'CNPJ '+esc(c.cnpj)+' · ':''}${c.n} contratos · ${fmtBRL(c.vt)}</small></div>
+      <div class="mix" title="concluídas ${c.done} · andamento ${c.ong} · paralisadas/sem evolução ${c.parS} · canceladas ${c.can}">
+        <i class="ok" style="width:${c.done/c.n*100}%"></i><i class="and" style="width:${c.ong/c.n*100}%"></i>
+        <i class="par" style="width:${c.parS/c.n*100}%"></i><i class="can" style="width:${c.can/c.n*100}%"></i>
+      </div>
+      <div class="score ${c.score>=50?'s-hi':c.score>=30?'s-md':'s-lo'}">${c.score}</div>
+    </div>`).join('') || '<div class="sub" style="padding:14px 0">Nenhuma empresa encontrada.</div>';
+  document.querySelectorAll('.stake').forEach(el => {
+    el.addEventListener('click', () => showContr(el.dataset.k));
+    el.addEventListener('keydown', e => { if(e.key==='Enter') showContr(el.dataset.k); });
+  });
+}
+
+function showContr(key){
+  const c = CONTR.find(x => x.key === key);
+  if (!c) return;
+  const rows = [...c.rows].sort((a,b)=>b.vt-a.vt);
+  const e = empRate(c.key);
+  document.getElementById('c-detail-body').innerHTML = `
+    <h2 style="font-size:1.2rem">${esc(c.name)}</h2>
+    <div class="sub">${c.cnpj?'CNPJ '+esc(c.cnpj)+' · ':''}índice de risco <b class="${c.score>=50?'s-hi':c.score>=30?'s-md':'s-lo'}">${c.score}</b>${e?' · dos contratos já encerrados, <b>'+e.p+' de '+e.n+'</b> deram problema':''}</div>
+    <div class="kpis" style="margin:14px 0">
+      <div class="kpi"><b>${c.n}</b><span>contratos</span></div>
+      <div class="kpi ok"><b>${c.done}</b><span>concluídos</span></div>
+      <div class="kpi warn"><b>${c.parS}</b><span>paralisados / sem evolução</span></div>
+      <div class="kpi risk"><b>${c.can}</b><span>cancelados</span></div>
+      <div class="kpi risk"><b>${fmtBRL(c.vRisk)}</b><span>valor em risco</span></div>
+    </div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>ID</th><th>Ação</th><th>Órgão</th><th>Status</th><th>Exec.</th><th>Valor</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr>
+        <td class="num">${esc(r.id)}</td><td>${esc(r.n)}${isStopped(r)&&r.s!=='Paralisado Com Termo'?' <span class="tag t-par">parada</span>':''}</td>
+        <td>${esc(r.o)}</td><td>${statusTag(r.s)}</td>
+        <td class="num">${r.p==null?'—':Math.round(r.p)+'%'}</td><td class="num">${r.vt?fmtBRL(r.vt):'—'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  document.getElementById('c-list').style.display='none';
+  document.getElementById('ep-card').style.display='none';
+  document.getElementById('c-detail').style.display='block';
+  window.scrollTo({top:0});
+}
+
+/* ============================================================
+   TELA: OBRAS
+   ============================================================ */
+let oPage = 0; const PER = 50;
+function oFiltered(){
+  const q = document.getElementById('o-search').value.toLowerCase();
+  const st = document.getElementById('o-status').value;
+  const og = document.getElementById('o-orgao').value;
+  const tp = document.getElementById('o-tipo').value;
+  return DATA.filter(r =>
+    (!st || r.s===st) && (!og || r.o===og) && (!tp || r.t===tp) &&
+    (!q || r.n.toLowerCase().includes(q) || r.m.toLowerCase().includes(q) || r.c.toLowerCase().includes(q) || r.id===q));
+}
+function renderObras(){
+  const list = oFiltered();
+  const pages = Math.max(1, Math.ceil(list.length/PER));
+  oPage = Math.min(oPage, pages-1);
+  document.getElementById('o-count').textContent = fmtN(list.length)+' obras encontradas';
+  document.getElementById('o-body').innerHTML = list.slice(oPage*PER,(oPage+1)*PER).map(r=>`<tr>
+    <td class="num">${esc(r.id)}</td>
+    <td>${esc(r.n)}${r.c?`<div style="font:400 .68rem var(--mono);color:var(--ink-2)">${esc(r.c)}</div>`:''}</td>
+    <td>${esc(r.o)}</td><td>${statusTag(r.s)}</td><td>${esc(r.m)||'—'}</td>
+    <td class="num">${r.p==null?'—':Math.round(r.p)+'%'}</td>
+    <td class="num">${r.vt?fmtBRL(r.vt):'—'}</td></tr>`).join('');
+  document.getElementById('o-page').textContent = (oPage+1)+' / '+pages;
+  document.getElementById('o-prev').disabled = oPage===0;
+  document.getElementById('o-next').disabled = oPage>=pages-1;
+}
+function buildObrasFilters(){
+  const fill = (id, vals) => {
+    const el = document.getElementById(id);
+    resetSelect(el);
+    [...new Set(vals.filter(Boolean))].sort().forEach(v => {
+      const o = document.createElement('option'); o.value = o.textContent = v; el.appendChild(o);
+    });
+  };
+  fill('o-status', DATA.map(r=>r.s));
+  fill('o-orgao', DATA.map(r=>r.o));
+  fill('o-tipo', DATA.map(r=>r.t));
+}
+
+/* ============================================================
+   NAVEGAÇÃO E EVENTOS
+   ============================================================ */
+function show(id){
+  if (!document.getElementById('s-'+id)) id = 'geral';
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.getElementById('s-'+id).classList.add('on');
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on', b.dataset.s===id));
+  location.hash = id;
+}
+document.getElementById('nav').addEventListener('click', e => {
+  if (e.target.dataset.s) show(e.target.dataset.s);
+});
+document.getElementById('c-back').addEventListener('click', () => {
+  document.getElementById('c-detail').style.display='none';
+  document.getElementById('c-list').style.display='block';
+  document.getElementById('ep-card').style.display='block';
+});
+
+function buildAll(){
+  buildEmpHistory();
+  buildContractors();
+  buildAlertas();
+  buildEvidencia();
+  buildGeral();
+  buildAlertasTela();
+  buildParalisacoes();
+  renderContr();
+  buildEmpProb();
+  buildObrasFilters();
+  renderObras();
+}
+
+document.getElementById('c-search').addEventListener('input', renderContr);
+document.getElementById('c-min').addEventListener('change', renderContr);
+['o-search','o-status','o-orgao','o-tipo'].forEach(id =>
+  document.getElementById(id).addEventListener(id==='o-search'?'input':'change', ()=>{oPage=0;renderObras();}));
+document.getElementById('o-prev').addEventListener('click', ()=>{oPage--;renderObras();});
+document.getElementById('o-next').addEventListener('click', ()=>{oPage++;renderObras();});
+['al-search','al-lvl','al-orgao'].forEach(id =>
+  document.getElementById(id).addEventListener(id==='al-search'?'input':'change', ()=>{alPage=0;renderAlertas();}));
+document.getElementById('al-prev').addEventListener('click', ()=>{alPage--;renderAlertas();});
+document.getElementById('al-next').addEventListener('click', ()=>{alPage++;renderAlertas();});
+['po-orgao','po-sort'].forEach(id =>
+  document.getElementById(id).addEventListener('change', ()=>{poPage=0;renderParadas();}));
+document.getElementById('po-prev').addEventListener('click', ()=>{poPage--;renderParadas();});
+document.getElementById('po-next').addEventListener('click', ()=>{poPage++;renderParadas();});
+
+document.getElementById('cfg-url').value = localStorage.getItem(LS_KEY) || '';
+document.getElementById('cfg-save').addEventListener('click', () => {
+  const v = document.getElementById('cfg-url').value.trim();
+  if (v) localStorage.setItem(LS_KEY, v); else localStorage.removeItem(LS_KEY);
+  location.reload();
+});
+
+load();
+</script>
+</body>
+</html>
