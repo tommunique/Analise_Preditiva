@@ -259,7 +259,7 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
       <h2>Por que confiar nesses alertas</h2>
       <div class="sub">Cada sinal foi testado contra as <b id="ev-n"></b> obras já encerradas da sua própria planilha: a barra mostra quantas das obras com aquele sinal terminaram mal. A linha preta é a média geral (<b id="ev-base"></b>) — barra à direita dela = sinal de perigo real.</div>
       <div id="ev-bars"></div>
-      <div class="note">"Problema" aqui sempre significa status <span class="tag t-can">Cancelado</span>, <span class="tag t-par">Sem Evolução</span> ou <span class="tag t-par">Paralisado Com Termo</span> — nunca uma obra só porque está atrasada. <a href="#" id="ev-verlista" style="color:var(--steel)">Ver a lista completa de obras com problema →</a></div>
+      <div class="note">"Problema" aqui é sempre um desfecho definitivo: <span class="tag t-can">Cancelado</span>, ou <span class="tag t-ok">Concluído</span> com aditivo de custo acima de 10% sobre o valor original — nunca uma obra só porque está atrasada. <span class="tag t-par">Sem Evolução</span> e <span class="tag t-par">Paralisado Com Termo</span> ainda estão em aberto e contam como <b>risco alto</b>, não como problema confirmado. <a href="#" id="ev-verlista" style="color:var(--steel)">Ver a lista completa de obras com problema →</a></div>
     </div>
   </section>
 
@@ -337,7 +337,7 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
         </select>
       </div>
       <div id="c-rows"></div>
-      <div class="note">Índice de risco = 60 × taxa de contratos com problema (cancelado, sem evolução ou paralisado) + 40 × taxa histórica de paralisação. É triagem, não julgamento definitivo.</div>
+      <div class="note">Índice de risco = 55 × taxa de problema confirmado (cancelado ou concluído com aditivo alto) + 25 × taxa de risco alto (sem evolução/paralisada, ainda em aberto) + 20 × taxa histórica de paralisação. É triagem, não julgamento definitivo.</div>
     </div>
     <div id="c-detail" class="card">
       <button class="back" id="c-back">← voltar ao ranking</button>
@@ -352,7 +352,7 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
       <div class="sub" id="o-count"></div>
       <div class="filters">
         <input id="o-search" type="search" placeholder="Buscar por nome, município, contratada…">
-        <select id="o-status"><option value="">Status: todos</option><option value="__problema__">⚠ Com problema (cancelado, sem evolução, paralisado)</option></select>
+        <select id="o-status"><option value="">Status: todos</option><option value="__problema__">⚠ Com problema (cancelado / concluído c/ aditivo alto)</option><option value="__risco__">🟡 Risco alto (sem evolução/paralisada)</option></select>
         <select id="o-orgao"><option value="">Órgão: todos</option></select>
         <select id="o-tipo"><option value="">Tipologia: todas</option></select>
       </div>
@@ -458,6 +458,7 @@ function normalize(raw){
       pz: cl(r['Prazo de conclusão']),
       t: cl(r['TIPOLOGIA']), cl: cl(r['CLASSIFICAÇÃO']), m: cl(r['Localização (Município)']),
       dc: cl(r['Data da celebração']),
+      vo: money(r['Valor Original']),
       vt: money(r['Valor Total']), vp: money(r['Valor pago total']),
       dp: cl(r['Data da Última Paralisação']), dr: cl(r['Data de reinício da Última Paralisação']),
       mo: cl(r['Motivo da Paralisação']),
@@ -557,12 +558,28 @@ function applyYearFilter(){
 
 /* ============================================================
    CLASSIFICAÇÃO
+   ------------------------------------------------------------
+   "Problema confirmado" = desfecho definitivo e ruim:
+     · Cancelado
+     · Concluído, mas com aditivo de custo > 10% sobre o valor
+       original (obra saiu, mas custou bem mais que o combinado)
+   "Risco alto" = situação preocupante mas ainda em aberto:
+     · Sem Evolução / Paralisado Com Termo — pode se resolver
+       com o tempo, por isso NÃO entra na taxa de "problema"
+       da empresa, mas conta como alerta ativo na obra.
+   "Encerrada" (base do histórico/backtest) = só Concluído ou
+   Cancelado — desfecho que não muda mais. Sem Evolução e
+   Paralisado ficam de fora da base por ainda serem incertos.
    ============================================================ */
-const isProblem = r => ['Cancelado','Sem Evolução','Paralisado Com Termo'].includes(r.s);
+const hasAditivoExcess = r => r.vo > 0 && r.vt > r.vo * 1.10;
+const isProblem  = r => r.s === 'Cancelado' || (r.s === 'Concluído' && hasAditivoExcess(r));
+const isRiscoAlto = r => r.s === 'Sem Evolução' || r.s === 'Paralisado Com Termo';
+const isFinished = r => r.s === 'Concluído' || r.s === 'Cancelado';
 const isOngoing = r => ['Em desenvolvimento','Em aberto'].includes(r.s);
 const isDone    = r => r.s === 'Concluído';
-/* parada agora = status oficial OU paralisação sem reinício válido em obra ativa */
-const isStopped = r => r.s === 'Paralisado Com Termo' ||
+/* parada agora = status oficial (Paralisado ou Sem Evolução)
+   OU paralisação registrada sem reinício válido em obra ativa */
+const isStopped = r => r.s === 'Paralisado Com Termo' || r.s === 'Sem Evolução' ||
   (!!r.dp && !parseDate(r.dr) && !isDone(r) && r.s !== 'Cancelado');
 const payGap = r => (r.vt > 0 && r.p != null) ? (r.vp/r.vt - r.p/100) : 0;
 
@@ -585,10 +602,12 @@ function motivoCat(mo){
 const EMP = { base: 0.2, map: new Map() };
 function buildEmpHistory(){
   /* histórico completo (RAW): a reputação da empresa não depende
-     do filtro de ano — ele define quais obras analisar, não o passado */
-  const fin = RAW.filter(r => isDone(r) || isProblem(r));
+     do filtro de ano — ele define quais obras analisar, não o passado.
+     Base = só desfechos definitivos (Concluído/Cancelado); Sem Evolução
+     e Paralisado ficam de fora por ainda poderem se resolver. */
+  const fin = RAW.filter(isFinished);
   EMP.fin = fin;
-  EMP.base = fin.length ? fin.filter(isProblem).length / fin.length : 0.2;
+  EMP.base = fin.length ? fin.filter(isProblem).length / fin.length : 0.15;
   EMP.map.clear();
   for (const r of fin){
     const k = r.cj || r.c; if (!k) continue;
@@ -618,11 +637,15 @@ function obraAlertas(r){
   const dStop = parseDate(r.dp);
   const dPrazo = parseDate(r.pz);
 
-  // ⏸ parada sem reinício
-  if (r.dp && !parseDate(r.dr)){
+  // ⏸ parada sem reinício (inclui status oficial Paralisado Com Termo)
+  if ((r.dp && !parseDate(r.dr)) || r.s === 'Paralisado Com Termo'){
     const diasReais = r.dpar > 0 ? r.dpar : (dStop ? Math.round((HOJE-dStop)/864e5) : null);
     const t = diasReais ? ' há ' + (diasReais>=365 ? tempoTxt(diasReais/365) : diasReais+' dias') : '';
     f.push({txt:'⏸ Parada' + t + ' sem reinício', sev:'bad', pts:3});
+  }
+  // 🟡 sem evolução registrada — em aberto, ainda não é "problema confirmado"
+  if (r.s === 'Sem Evolução'){
+    f.push({txt:'🟡 Status "Sem Evolução" — obra estagnada, ainda não cancelada nem retomada', sev:'mid', pts:2});
   }
   // 🏢 empresa com histórico ruim
   if (e && e.n >= 5 && e.rate >= 0.35){
@@ -651,6 +674,11 @@ function obraAlertas(r){
   if (r.dpar >= 365 && !(r.dp && !parseDate(r.dr))){
     f.push({txt:'🔁 Já ficou ' + tempoTxt(r.dpar/365) + ' parada ao longo do contrato', sev:'mid', pts:1});
   }
+  // 💸 aditivo de custo já ultrapassa 10% do valor original
+  if (hasAditivoExcess(r)){
+    const pctA = Math.round((r.vt/r.vo - 1) * 100);
+    f.push({txt:'💸 Valor já subiu ' + pctA + '% acima do contrato original (aditivo)', sev: pctA>=30?'bad':'mid', pts: pctA>=30?2:1});
+  }
   // sinais positivos (não pontuam, só informam)
   if (r.dp && parseDate(r.dr)){
     f.push({txt:'↩ Já parou e retomou — historicamente essas terminam bem', sev:'good', pts:0});
@@ -663,7 +691,7 @@ function obraAlertas(r){
 }
 
 function buildAlertas(){
-  ALERTAS = DATA.filter(r => isOngoing(r) && (r.c || r.dc || r.dp))
+  ALERTAS = DATA.filter(r => (isOngoing(r) || isRiscoAlto(r)) && (r.c || r.dc || r.dp))
     .map(r => ({r, ...obraAlertas(r)}))
     .filter(x => x.pts > 0)
     .sort((a,b) => b.pts - a.pts || (b.r.vt-b.r.vp) - (a.r.vt-a.r.vp));
@@ -705,12 +733,14 @@ function buildContractors(){
     const ong  = c.rows.filter(isOngoing).length;
     const can  = c.rows.filter(r => r.s === 'Cancelado').length;
     const parS = c.rows.filter(r => ['Sem Evolução','Paralisado Com Termo'].includes(r.s)).length;
-    const prob = c.rows.filter(isProblem).length;
-    const stops= c.rows.filter(r => r.dp).length;
+    const prob = c.rows.filter(isProblem).length;      // problema confirmado
+    const risco= c.rows.filter(isRiscoAlto).length;    // sem evolução / paralisado — em aberto
+    const stops= c.rows.filter(r => r.dp).length;       // já teve paralisação alguma vez
     const vt   = c.rows.reduce((a,r)=>a+r.vt,0);
-    const vRisk= c.rows.filter(r => isProblem(r)||isStopped(r)).reduce((a,r)=>a+r.vt,0);
-    const score= Math.round(60*(prob/n) + 40*(stops/n));
-    return {...c, n, done, ong, can, parS, prob, stops, vt, vRisk, score};
+    const vRisk= c.rows.filter(r => isProblem(r)||isRiscoAlto(r)).reduce((a,r)=>a+r.vt,0);
+    /* score: problema confirmado pesa mais que risco em aberto */
+    const score= Math.round(55*(prob/n) + 25*(risco/n) + 20*(stops/n));
+    return {...c, n, done, ong, can, parS, prob, risco, stops, vt, vRisk, score};
   }).sort((a,b)=> b.score - a.score || b.n - a.n);
 }
 
@@ -778,7 +808,7 @@ function buildGeral(){
     <div class="kpi ok"><b>${fmtN(DATA.filter(isDone).length)}</b><span>concluídas</span></div>
     <div class="kpi"><b>${fmtN(DATA.filter(isOngoing).length)}</b><span>em andamento</span></div>
     <div class="kpi warn kpi-click" data-goto="paralisacoes"><b>${fmtN(stopped)}</b><span>paradas agora</span></div>
-    <div class="kpi risk kpi-click" data-goto="alertas" data-allvl="3"><b>${fmtN(crit)}</b><span>em andamento com alerta crítico</span></div>
+    <div class="kpi risk kpi-click" data-goto="alertas" data-allvl="3"><b>${fmtN(crit)}</b><span>obras ativas com alerta crítico</span></div>
     <div class="kpi risk kpi-click" data-goto="obras" data-status="__problema__"><b>${fmtN(prob)}</b><span>ao todo com problema (${(prob/total*100).toFixed(1)}%) — ver lista</span></div>
     <div class="kpi risk"><b>${fmtBRL(vRisk)}</b><span>valor em risco / ${fmtBRL(vTot)} total</span></div>`;
   document.querySelectorAll('.kpi-click').forEach(el => {
@@ -817,7 +847,7 @@ function buildGeral(){
       </div>
       <div style="font:400 .7rem var(--mono);color:var(--ink-2);margin:1px 0 4px">${esc(x.r.o)} · ${esc(x.r.m)||'—'}</div>
       <div>${alChips(x.f.filter(y=>y.sev!=='good').slice(0,2))}</div>
-    </div>`).join('') || '<div class="sub">Nenhuma obra em andamento com alertas. 🎉</div>';
+    </div>`).join('') || '<div class="sub">Nenhuma obra ativa com alertas. 🎉</div>';
 }
 
 /* ============================================================
@@ -825,7 +855,7 @@ function buildGeral(){
    ============================================================ */
 let alPage = 0; const AL_PER = 25;
 function buildAlertasTela(){
-  const contratadas = DATA.filter(r => isOngoing(r) && (r.c || r.dc)).length;
+  const contratadas = DATA.filter(r => (isOngoing(r)||isRiscoAlto(r)) && (r.c || r.dc)).length;
   const crit = ALERTAS.filter(x=>x.lvl>=3);
   const alto = ALERTAS.filter(x=>x.lvl===2);
   const vExp = [...crit,...alto].reduce((a,x)=>a+Math.max(x.r.vt-x.r.vp,0),0);
@@ -1003,14 +1033,15 @@ function buildEmpProb(){
     if (!e || e.n < 5 || e.rate < 0.35) return null;
     const ativas = c.rows.filter(isOngoing);
     const vAtivo = ativas.reduce((a,r)=>a+Math.max(r.vt-r.vp,0),0);
-    return {c, e, nAtivas: ativas.length, vAtivo};
+    const riscoAtual = c.rows.filter(isRiscoAlto).length;
+    return {c, e, nAtivas: ativas.length, vAtivo, riscoAtual};
   }).filter(Boolean)
     .sort((a,b) => b.vAtivo - a.vAtivo || b.nAtivas - a.nAtivas || b.e.rate - a.e.rate);
 
   const comAtivas = list.filter(x=>x.nAtivas>0);
   const vTotal = comAtivas.reduce((a,x)=>a+x.vAtivo,0);
   document.getElementById('ep-sub').innerHTML =
-    `Empresas em que <b>pelo menos 35% dos contratos já encerrados deram problema</b> (mín. 5 contratos). ` +
+    `Empresas em que <b>pelo menos 35% dos contratos já encerrados deram problema</b> (mín. 5 contratos; considera Cancelado ou Concluído com aditivo de custo acima de 10%). ` +
     `No histórico, obras dessas empresas terminaram mal em <b>${(EVID.itens[0].v*100).toFixed(0)}%</b> dos casos. ` +
     (comAtivas.length
       ? `<span style="color:var(--risk)"><b>${comAtivas.length}</b> delas ainda têm obras ativas — <b>${fmtBRL(vTotal)}</b> a executar sob risco.</span>`
@@ -1022,7 +1053,10 @@ function buildEmpProb(){
         <b>${esc(x.c.name)}</b>
         <small>${x.c.cnpj?'CNPJ '+esc(x.c.cnpj)+' · ':''}${fmtBRL(x.c.vt)} contratados no total</small>
       </div>
-      <div class="frase">${x.e.p} de ${x.e.n} contratos deram problema <span style="font-weight:400;opacity:.75">— ver quais →</span></div>
+      <div style="min-width:220px">
+        <div class="frase">${x.e.p} de ${x.e.n} contratos deram problema <span style="font-weight:400;opacity:.75">— ver quais →</span></div>
+        ${x.riscoAtual ? `<div style="font:500 .68rem 'IBM Plex Sans';color:#8A5E10;margin-top:4px">🟡 +${x.riscoAtual} em situação de risco alto agora (sem evolução/paralisada, ainda não confirmado como problema)</div>` : ''}
+      </div>
       <div class="expo ${x.nAtivas? '':'zero'}">
         ${x.nAtivas
           ? `<b>${x.nAtivas} obra${x.nAtivas>1?'s':''} ativa${x.nAtivas>1?'s':''} agora</b>${fmtBRL(x.vAtivo)} a executar`
@@ -1030,7 +1064,9 @@ function buildEmpProb(){
       </div>
     </div>`).join('') || '<div class="sub" style="padding:14px 0">Nenhuma empresa se encaixa no critério. 🎉</div>';
   document.getElementById('ep-legend').innerHTML =
-    `<b>O que conta como "problema"?</b> Um contrato é contado como problema quando termina com status <span class="tag t-can">Cancelado</span>, <span class="tag t-par">Sem Evolução</span> ou <span class="tag t-par">Paralisado Com Termo</span> — nunca por atraso isolado ou por decisão de triagem manual. Clique em qualquer empresa acima pra ver a lista completa dos contratos dela, com o ID e o status de cada um.`;
+    `<b>O que conta como "problema"?</b> Só desfechos definitivos e ruins: <span class="tag t-can">Cancelado</span>, ou <span class="tag t-ok">Concluído</span> com aditivo de custo acima de 10% sobre o valor original. ` +
+    `<span class="tag t-par">Sem Evolução</span> e <span class="tag t-par">Paralisado Com Termo</span> ainda podem se resolver, então contam como <b>risco alto</b> — um alerta ativo, não uma reputação definitiva — e aparecem na aba Alertas e em Paralisações. ` +
+    `Clique em qualquer empresa acima pra ver a lista completa dos contratos dela, com o ID e o status de cada um.`;
 
   document.querySelectorAll('.ep').forEach(el => {
     el.addEventListener('click', () => { showContr(el.dataset.k, true); });
@@ -1083,7 +1119,7 @@ function showContr(key, focusProblemas){
       <button id="cd-toggle" class="ychip ${CDETAIL_SOPROBLEMA?'on':''}" style="border-radius:6px">
         ⚠ Mostrar só os ${nProb} contratos com problema
       </button>
-      <span style="font:400 .78rem 'IBM Plex Sans';color:var(--ink-2)">Linhas em vermelho abaixo = contratos cancelados, sem evolução ou paralisados.</span>
+      <span style="font:400 .78rem 'IBM Plex Sans';color:var(--ink-2)"><span style="color:var(--risk)">■ vermelho</span> = problema confirmado (cancelado ou concluído com aditivo alto) · <span style="color:#8A5E10">■ âmbar</span> = risco alto, ainda em aberto (sem evolução/paralisada)</span>
     </div>
     <div style="overflow-x:auto"><table id="cd-table"></table></div>`;
   renderCdTable(c);
@@ -1100,14 +1136,17 @@ function showContr(key, focusProblemas){
 function renderCdTable(c){
   const rows = [...c.rows]
     .filter(r => !CDETAIL_SOPROBLEMA || isProblem(r))
-    .sort((a,b) => (isProblem(b)-isProblem(a)) || b.vt-a.vt);
+    .sort((a,b) => (isProblem(b)-isProblem(a)) || (isRiscoAlto(b)-isRiscoAlto(a)) || b.vt-a.vt);
   document.getElementById('cd-table').innerHTML = `
     <thead><tr><th>ID</th><th>Ação</th><th>Órgão</th><th>Status</th><th>Exec.</th><th>Valor</th></tr></thead>
-    <tbody>${rows.map(r=>`<tr${isProblem(r)?' style="background:var(--risk-soft)"':''}>
-      <td class="num">${esc(r.id)}</td><td>${esc(r.n)}${isStopped(r)&&r.s!=='Paralisado Com Termo'?' <span class="tag t-par">parada</span>':''}</td>
+    <tbody>${rows.map(r=>{
+      const bg = isProblem(r) ? 'var(--risk-soft)' : isRiscoAlto(r) ? 'var(--warn-soft)' : '';
+      const aditivo = r.s==='Concluído' && hasAditivoExcess(r) ? ' <span class="tag t-can">aditivo +' + Math.round((r.vt/r.vo-1)*100) + '%</span>' : '';
+      return `<tr${bg?` style="background:${bg}"`:''}>
+      <td class="num">${esc(r.id)}</td><td>${esc(r.n)}${aditivo}${isStopped(r)&&r.s!=='Paralisado Com Termo'&&r.s!=='Sem Evolução'?' <span class="tag t-par">parada</span>':''}</td>
       <td>${esc(r.o)}</td><td>${statusTag(r.s)}</td>
       <td class="num">${r.p==null?'—':Math.round(r.p)+'%'}</td><td class="num">${r.vt?fmtBRL(r.vt):'—'}</td>
-    </tr>`).join('') || '<tr><td colspan="6" class="sub" style="padding:10px 8px">Nenhum contrato nessa condição.</td></tr>'}</tbody>`;
+    </tr>`; }).join('') || '<tr><td colspan="6" class="sub" style="padding:10px 8px">Nenhum contrato nessa condição.</td></tr>'}</tbody>`;
 }
 
 /* ============================================================
@@ -1120,7 +1159,7 @@ function oFiltered(){
   const og = document.getElementById('o-orgao').value;
   const tp = document.getElementById('o-tipo').value;
   return DATA.filter(r =>
-    (!st || (st==='__problema__' ? isProblem(r) : r.s===st)) && (!og || r.o===og) && (!tp || r.t===tp) &&
+    (!st || (st==='__problema__' ? isProblem(r) : st==='__risco__' ? isRiscoAlto(r) : r.s===st)) && (!og || r.o===og) && (!tp || r.t===tp) &&
     (!q || r.n.toLowerCase().includes(q) || r.m.toLowerCase().includes(q) || r.c.toLowerCase().includes(q) || r.id===q));
 }
 function renderObras(){
@@ -1146,7 +1185,7 @@ function buildObrasFilters(){
       const o = document.createElement('option'); o.value = o.textContent = v; el.appendChild(o);
     });
   };
-  fill('o-status', DATA.map(r=>r.s), 2);
+  fill('o-status', DATA.map(r=>r.s), 3);
   fill('o-orgao', DATA.map(r=>r.o));
   fill('o-tipo', DATA.map(r=>r.t));
 }
