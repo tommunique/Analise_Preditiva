@@ -438,7 +438,9 @@ function normalize(raw){
     return isNaN(n) ? 0 : n;
   };
   const pctv = v => {
-    if (typeof v === 'number') return v;
+    /* a API do Apps Script devolve célula de % como fração (0.9535),
+       não como texto "95,35%" — só o CSV exportado vem como texto */
+    if (typeof v === 'number') return v <= 1 ? v * 100 : v;
     if (!v || v === '-') return null;
     const n = parseFloat(String(v).replace('%','').replace(',','.'));
     return isNaN(n) ? null : n;
