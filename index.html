@@ -1022,7 +1022,7 @@ function buildEmpProb(){
         <b>${esc(x.c.name)}</b>
         <small>${x.c.cnpj?'CNPJ '+esc(x.c.cnpj)+' · ':''}${fmtBRL(x.c.vt)} contratados no total</small>
       </div>
-      <div class="frase">${x.e.p} de ${x.e.n} contratos deram problema</div>
+      <div class="frase">${x.e.p} de ${x.e.n} contratos deram problema <span style="font-weight:400;opacity:.75">— ver quais →</span></div>
       <div class="expo ${x.nAtivas? '':'zero'}">
         ${x.nAtivas
           ? `<b>${x.nAtivas} obra${x.nAtivas>1?'s':''} ativa${x.nAtivas>1?'s':''} agora</b>${fmtBRL(x.vAtivo)} a executar`
@@ -1033,8 +1033,8 @@ function buildEmpProb(){
     `<b>O que conta como "problema"?</b> Um contrato é contado como problema quando termina com status <span class="tag t-can">Cancelado</span>, <span class="tag t-par">Sem Evolução</span> ou <span class="tag t-par">Paralisado Com Termo</span> — nunca por atraso isolado ou por decisão de triagem manual. Clique em qualquer empresa acima pra ver a lista completa dos contratos dela, com o ID e o status de cada um.`;
 
   document.querySelectorAll('.ep').forEach(el => {
-    el.addEventListener('click', () => { showContr(el.dataset.k); });
-    el.addEventListener('keydown', e => { if(e.key==='Enter') showContr(el.dataset.k); });
+    el.addEventListener('click', () => { showContr(el.dataset.k, true); });
+    el.addEventListener('keydown', e => { if(e.key==='Enter') showContr(el.dataset.k, true); });
   });
 }
 
@@ -1062,11 +1062,13 @@ function renderContr(){
   });
 }
 
-function showContr(key){
+let CDETAIL_SOPROBLEMA = false;
+function showContr(key, focusProblemas){
   const c = CONTR.find(x => x.key === key);
   if (!c) return;
-  const rows = [...c.rows].sort((a,b)=>b.vt-a.vt);
+  CDETAIL_SOPROBLEMA = !!focusProblemas;
   const e = empRate(c.key);
+  const nProb = c.rows.filter(isProblem).length;
   document.getElementById('c-detail-body').innerHTML = `
     <h2 style="font-size:1.2rem">${esc(c.name)}</h2>
     <div class="sub">${c.cnpj?'CNPJ '+esc(c.cnpj)+' · ':''}índice de risco <b class="${c.score>=50?'s-hi':c.score>=30?'s-md':'s-lo'}">${c.score}</b>${e?' · dos contratos já encerrados, <b>'+e.p+' de '+e.n+'</b> deram problema':''}</div>
@@ -1077,18 +1079,35 @@ function showContr(key){
       <div class="kpi risk"><b>${c.can}</b><span>cancelados</span></div>
       <div class="kpi risk"><b>${fmtBRL(c.vRisk)}</b><span>valor em risco</span></div>
     </div>
-    <div style="overflow-x:auto"><table>
-      <thead><tr><th>ID</th><th>Ação</th><th>Órgão</th><th>Status</th><th>Exec.</th><th>Valor</th></tr></thead>
-      <tbody>${rows.map(r=>`<tr>
-        <td class="num">${esc(r.id)}</td><td>${esc(r.n)}${isStopped(r)&&r.s!=='Paralisado Com Termo'?' <span class="tag t-par">parada</span>':''}</td>
-        <td>${esc(r.o)}</td><td>${statusTag(r.s)}</td>
-        <td class="num">${r.p==null?'—':Math.round(r.p)+'%'}</td><td class="num">${r.vt?fmtBRL(r.vt):'—'}</td>
-      </tr>`).join('')}</tbody>
-    </table></div>`;
+    <div class="filters" style="align-items:center">
+      <button id="cd-toggle" class="ychip ${CDETAIL_SOPROBLEMA?'on':''}" style="border-radius:6px">
+        ⚠ Mostrar só os ${nProb} contratos com problema
+      </button>
+      <span style="font:400 .78rem 'IBM Plex Sans';color:var(--ink-2)">Linhas em vermelho abaixo = contratos cancelados, sem evolução ou paralisados.</span>
+    </div>
+    <div style="overflow-x:auto"><table id="cd-table"></table></div>`;
+  renderCdTable(c);
+  document.getElementById('cd-toggle').addEventListener('click', () => {
+    CDETAIL_SOPROBLEMA = !CDETAIL_SOPROBLEMA;
+    document.getElementById('cd-toggle').classList.toggle('on', CDETAIL_SOPROBLEMA);
+    renderCdTable(c);
+  });
   document.getElementById('c-list').style.display='none';
   document.getElementById('ep-card').style.display='none';
   document.getElementById('c-detail').style.display='block';
   window.scrollTo({top:0});
+}
+function renderCdTable(c){
+  const rows = [...c.rows]
+    .filter(r => !CDETAIL_SOPROBLEMA || isProblem(r))
+    .sort((a,b) => (isProblem(b)-isProblem(a)) || b.vt-a.vt);
+  document.getElementById('cd-table').innerHTML = `
+    <thead><tr><th>ID</th><th>Ação</th><th>Órgão</th><th>Status</th><th>Exec.</th><th>Valor</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr${isProblem(r)?' style="background:var(--risk-soft)"':''}>
+      <td class="num">${esc(r.id)}</td><td>${esc(r.n)}${isStopped(r)&&r.s!=='Paralisado Com Termo'?' <span class="tag t-par">parada</span>':''}</td>
+      <td>${esc(r.o)}</td><td>${statusTag(r.s)}</td>
+      <td class="num">${r.p==null?'—':Math.round(r.p)+'%'}</td><td class="num">${r.vt?fmtBRL(r.vt):'—'}</td>
+    </tr>`).join('') || '<tr><td colspan="6" class="sub" style="padding:10px 8px">Nenhum contrato nessa condição.</td></tr>'}</tbody>`;
 }
 
 /* ============================================================
