@@ -59,6 +59,7 @@ nav button:focus-visible{outline:2px solid var(--warn);outline-offset:-2px}
 .kpi.ok{border-top-color:var(--ok)}
 .kpi b{display:block;font:700 1.7rem 'Barlow Semi Condensed';line-height:1.15}
 .kpi span{font-size:.74rem;color:var(--ink-2);text-transform:uppercase;letter-spacing:.07em}
+.kpi-click:hover{box-shadow:0 0 0 2px var(--steel-soft) inset}
 
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:860px){.grid2{grid-template-columns:1fr}}
@@ -258,6 +259,7 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
       <h2>Por que confiar nesses alertas</h2>
       <div class="sub">Cada sinal foi testado contra as <b id="ev-n"></b> obras já encerradas da sua própria planilha: a barra mostra quantas das obras com aquele sinal terminaram mal. A linha preta é a média geral (<b id="ev-base"></b>) — barra à direita dela = sinal de perigo real.</div>
       <div id="ev-bars"></div>
+      <div class="note">"Problema" aqui sempre significa status <span class="tag t-can">Cancelado</span>, <span class="tag t-par">Sem Evolução</span> ou <span class="tag t-par">Paralisado Com Termo</span> — nunca uma obra só porque está atrasada. <a href="#" id="ev-verlista" style="color:var(--steel)">Ver a lista completa de obras com problema →</a></div>
     </div>
   </section>
 
@@ -270,7 +272,7 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
       <div class="sub">Obras com 80%+ de execução que estão paradas. É onde pouco esforço destrava uma entrega inteira.</div>
       <div style="overflow-x:auto">
         <table>
-          <thead><tr><th>Obra</th><th>Órgão</th><th>Executado</th><th>Falta pagar</th><th>Parada desde</th></tr></thead>
+          <thead><tr><th>ID</th><th>Obra</th><th>Órgão</th><th>Executado</th><th>Falta pagar</th><th>Parada desde</th></tr></thead>
           <tbody id="qp-body"></tbody>
         </table>
       </div>
@@ -289,7 +291,7 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
       </div>
       <div style="overflow-x:auto">
         <table>
-          <thead><tr><th>Obra</th><th>Órgão</th><th>Exec.</th><th>Parada há</th><th>Motivo</th><th>Valor</th></tr></thead>
+          <thead><tr><th>ID</th><th>Obra</th><th>Órgão</th><th>Exec.</th><th>Parada há</th><th>Motivo</th><th>Valor</th></tr></thead>
           <tbody id="po-body"></tbody>
         </table>
       </div>
@@ -321,6 +323,7 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
       <h2>🏢 Empresas problemáticas</h2>
       <div class="sub" id="ep-sub"></div>
       <div id="ep-rows"></div>
+      <div class="note" id="ep-legend" style="margin-top:14px"></div>
     </div>
     <div id="c-list" class="card">
       <h2>Ranking de risco das contratadas</h2>
@@ -349,7 +352,7 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
       <div class="sub" id="o-count"></div>
       <div class="filters">
         <input id="o-search" type="search" placeholder="Buscar por nome, município, contratada…">
-        <select id="o-status"><option value="">Status: todos</option></select>
+        <select id="o-status"><option value="">Status: todos</option><option value="__problema__">⚠ Com problema (cancelado, sem evolução, paralisado)</option></select>
         <select id="o-orgao"><option value="">Órgão: todos</option></select>
         <select id="o-tipo"><option value="">Tipologia: todas</option></select>
       </div>
@@ -374,8 +377,14 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
       <div class="sub">O painel busca os dados na API do Apps Script. Sem URL configurada, tenta um arquivo <code>data.json</code> na mesma pasta.</div>
       <label for="cfg-url">URL do Web App (Apps Script)</label>
       <input id="cfg-url" type="url" placeholder="https://script.google.com/macros/s/…/exec">
+      <label for="cfg-key">Chave de acesso (se você configurou uma no Code.gs)</label>
+      <input id="cfg-key" type="password" placeholder="deixe em branco se não usa chave" autocomplete="off">
       <button id="cfg-save">Salvar e recarregar</button>
-      <div class="hint">A URL fica salva só neste navegador (localStorage). Cada pessoa da equipe configura uma vez.</div>
+      <button id="cfg-clear" style="background:none;color:var(--risk);border:1px solid var(--risk);margin-top:8px">Remover deste navegador</button>
+      <div class="hint">
+        A URL e a chave ficam salvas <b>só neste navegador, neste computador</b> — não são enviadas pra nenhum outro lugar nem sincronizam entre dispositivos. Cada pessoa da equipe configura uma vez, no próprio aparelho.<br><br>
+        <b>Importante:</b> se seu Apps Script está publicado como "qualquer pessoa com o link", quem tiver essa URL consegue ler a planilha, mesmo sem estar aqui no painel. Configurar uma chave de acesso no <code>Code.gs</code> (propriedade <code>API_KEY</code>) fecha essa brecha — sem a chave certa, a API recusa o pedido.
+      </div>
     </div>
   </section>
 
@@ -386,6 +395,7 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
    CARGA E NORMALIZAÇÃO
    ============================================================ */
 const LS_KEY = 'obras_api_url';
+const LS_KEY_TOKEN = 'obras_api_key';
 const HOJE = new Date();
 let RAW = [];                       // todas as obras do escopo (sem filtro de ano)
 let DATA = [], CONTR = [], ALERTAS = [], EVID = null;
@@ -443,13 +453,18 @@ function normalize(raw){
     return {
       id: cl(r['ID da Ação']), n: cl(r['Nome da Ação']), o: cl(r['Órgão da Ação']),
       s: cl(r['Status']), p: pctv(r['Percentual de Execução da Ação']),
+      pz: cl(r['Prazo de conclusão']),
       t: cl(r['TIPOLOGIA']), cl: cl(r['CLASSIFICAÇÃO']), m: cl(r['Localização (Município)']),
       dc: cl(r['Data da celebração']),
       vt: money(r['Valor Total']), vp: money(r['Valor pago total']),
       dp: cl(r['Data da Última Paralisação']), dr: cl(r['Data de reinício da Última Paralisação']),
-      mo: cl(r['Motivo da Paralisação']), cj, c
+      mo: cl(r['Motivo da Paralisação']),
+      dpar: (() => { const v = r['Quantidade de dias parado'];
+        if (v == null || v === '-' || v === '') return 0;
+        return String(v).split(/[|,;]/).reduce((a,p)=>{ const n=parseInt(p.trim(),10); return a + (isNaN(n)?0:n); }, 0); })(),
+      cj, c
     };
-  }).map(r => { r.dp = brDate(r.dp); r.dr = brDate(r.dr); r.dc = brDate(r.dc); return r; })
+  }).map(r => { r.dp = brDate(r.dp); r.dr = brDate(r.dr); r.dc = brDate(r.dc); r.pz = brDate(r.pz); return r; })
   /* escopo da análise: somente CLASSIFICAÇÃO = OBRA e sem
      referência a convênio no nome da ação (CONVÊNIO, CONV) */
     .filter(r => (!r.cl || r.cl.toUpperCase() === 'OBRA') &&
@@ -458,12 +473,15 @@ function normalize(raw){
 
 async function load(){
   const url = localStorage.getItem(LS_KEY);
-  const src = url ? url + (url.includes('?') ? '&' : '?') + 'action=read' : 'data.json';
+  const key = localStorage.getItem(LS_KEY_TOKEN);
+  let src = url ? url + (url.includes('?') ? '&' : '?') + 'action=read' : 'data.json';
+  if (url && key) src += '&key=' + encodeURIComponent(key);
   document.getElementById('loadmsg').textContent = 'carregando de ' + (url ? 'Apps Script' : 'data.json') + '…';
   try{
     const res = await fetch(src);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const json = await res.json();
+    if (json && json.error) throw new Error(json.error);
     RAW = normalize(Array.isArray(json) ? json : (json.rows || json.data || []));
     if (!RAW.length) throw new Error('resposta vazia');
     buildYearBar();
@@ -596,10 +614,12 @@ function obraAlertas(r){
   const dCel = parseDate(r.dc);
   const idade = dCel ? anosDesde(dCel) : null;
   const dStop = parseDate(r.dp);
+  const dPrazo = parseDate(r.pz);
 
   // ⏸ parada sem reinício
   if (r.dp && !parseDate(r.dr)){
-    const t = dStop ? ' há ' + tempoTxt(anosDesde(dStop)) : '';
+    const diasReais = r.dpar > 0 ? r.dpar : (dStop ? Math.round((HOJE-dStop)/864e5) : null);
+    const t = diasReais ? ' há ' + (diasReais>=365 ? tempoTxt(diasReais/365) : diasReais+' dias') : '';
     f.push({txt:'⏸ Parada' + t + ' sem reinício', sev:'bad', pts:3});
   }
   // 🏢 empresa com histórico ruim
@@ -616,18 +636,18 @@ function obraAlertas(r){
   if (idade != null && idade >= 2 && (r.p == null || r.p <= 5) && r.vp === 0){
     f.push({txt:'📄 Contrato de ' + tempoTxt(idade) + ' sem nada executado nem pago', sev:'bad', pts:2});
   }
-  // 🐌 ritmo lento → projeção de término
-  if (idade != null && idade >= 1.5 && r.p != null && r.p > 5 && r.p < 95 && !(r.dp && !parseDate(r.dr))){
-    const ritmo = r.p / idade;                      // pontos de execução por ano
-    if (ritmo < 15){
-      const anosFaltam = (100 - r.p) / ritmo;
-      const anoFim = HOJE.getFullYear() + Math.round(anosFaltam);
-      f.push({txt:'🐌 Ritmo lento: ' + Math.round(ritmo) + ' pts/ano — neste ritmo conclui em ' + (anoFim > HOJE.getFullYear()+15 ? 'décadas' : anoFim), sev:'mid', pts:1});
+  // ⏰ passou do prazo contratual e ainda não terminou (fato, não estimativa)
+  if (dPrazo && (r.p == null || r.p < 95)){
+    const diasAtraso = Math.round((HOJE - dPrazo)/864e5);
+    if (diasAtraso >= 730){
+      f.push({txt:'⏰ Prazo venceu em ' + esc(r.pz) + ' — ' + tempoTxt(diasAtraso/365) + ' de atraso', sev:'bad', pts:2});
+    } else if (diasAtraso >= 365){
+      f.push({txt:'⏰ Prazo venceu em ' + esc(r.pz) + ' — ' + tempoTxt(diasAtraso/365) + ' de atraso', sev:'mid', pts:1});
     }
   }
-  // 📅 contrato antigo ainda rodando
-  if (idade != null && idade >= 5 && (r.p == null || r.p < 95)){
-    f.push({txt:'📅 Contrato de ' + (dCel.getFullYear()) + ' (' + tempoTxt(idade) + ') ainda em execução', sev:'mid', pts:1});
+  // 🔁 já perdeu muito tempo parada ao longo do contrato, mesmo rodando agora
+  if (r.dpar >= 365 && !(r.dp && !parseDate(r.dr))){
+    f.push({txt:'🔁 Já ficou ' + tempoTxt(r.dpar/365) + ' parada ao longo do contrato', sev:'mid', pts:1});
   }
   // sinais positivos (não pontuam, só informam)
   if (r.dp && parseDate(r.dr)){
@@ -658,6 +678,7 @@ function buildEvidencia(){
     itens: [
       mk('🏢 Empresa problemática (≥35%)', fin.filter(r=>{const e=r.c&&empRate(r.cj||r.c);return e&&e.n>=5&&e.rate>=0.35;}), 'r'),
       mk('⏸ Parou e não reiniciou', fin.filter(r=>r.dp&&!parseDate(r.dr)), 'r'),
+      mk('🔁 Acumulou 1 ano+ parada no total', fin.filter(r=>r.dpar>=365), 'r'),
       mk('💰 Pagamento adiantado (+15 pts)', fin.filter(r=>r.p!=null&&r.p<100&&payGap(r)>0.15), 'w'),
       mk('↩ Parou mas reiniciou', fin.filter(r=>r.dp&&parseDate(r.dr)), 'g'),
       mk('✓ Empresa com bom histórico (<15%)', fin.filter(r=>{const e=r.c&&empRate(r.cj||r.c);return e&&e.n>=5&&e.rate<0.15;}), 'g'),
@@ -729,8 +750,9 @@ const lvlTag = lvl =>
 
 const alChips = f => f.map(x=>`<span class="al ${x.sev}">${esc(x.txt)}</span>`).join(' ');
 
-function resetSelect(el){
-  if (el && el.options) while (el.options.length > 1) el.remove(1);
+function resetSelect(el, keep){
+  keep = keep || 1;
+  if (el && el.options) while (el.options.length > keep) el.remove(keep);
 }
 function statusTag(s){
   const cls = s==='Concluído'?'t-ok': s==='Cancelado'?'t-can':
@@ -753,9 +775,19 @@ function buildGeral(){
     <div class="kpi"><b>${fmtN(total)}</b><span>obras na carteira</span></div>
     <div class="kpi ok"><b>${fmtN(DATA.filter(isDone).length)}</b><span>concluídas</span></div>
     <div class="kpi"><b>${fmtN(DATA.filter(isOngoing).length)}</b><span>em andamento</span></div>
-    <div class="kpi warn"><b>${fmtN(stopped)}</b><span>paradas agora</span></div>
-    <div class="kpi risk"><b>${fmtN(crit)}</b><span>em andamento com alerta crítico</span></div>
+    <div class="kpi warn kpi-click" data-goto="paralisacoes"><b>${fmtN(stopped)}</b><span>paradas agora</span></div>
+    <div class="kpi risk kpi-click" data-goto="alertas" data-allvl="3"><b>${fmtN(crit)}</b><span>em andamento com alerta crítico</span></div>
+    <div class="kpi risk kpi-click" data-goto="obras" data-status="__problema__"><b>${fmtN(prob)}</b><span>ao todo com problema (${(prob/total*100).toFixed(1)}%) — ver lista</span></div>
     <div class="kpi risk"><b>${fmtBRL(vRisk)}</b><span>valor em risco / ${fmtBRL(vTot)} total</span></div>`;
+  document.querySelectorAll('.kpi-click').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.title = 'Clique para ver a lista';
+    el.addEventListener('click', () => {
+      if (el.dataset.status){ document.getElementById('o-status').value = el.dataset.status; renderObras(); }
+      if (el.dataset.allvl){ document.getElementById('al-lvl').value = el.dataset.allvl; alPage=0; renderAlertas(); }
+      show(el.dataset.goto);
+    });
+  });
 
   const st = {};
   DATA.forEach(r => st[r.s] = (st[r.s]||0)+1);
@@ -778,7 +810,7 @@ function buildGeral(){
   document.getElementById('top-alertas').innerHTML = ALERTAS.slice(0,6).map(x => `
     <div style="padding:8px 0;border-bottom:1px solid var(--line)">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">
-        <div style="font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(x.r.n)}">${esc(x.r.n)}</div>
+        <div style="font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(x.r.n)}"><span style="font:500 .68rem var(--mono);color:var(--ink-2);font-weight:400">#${esc(x.r.id)}</span> ${esc(x.r.n)}</div>
         ${lvlTag(x.lvl)}
       </div>
       <div style="font:400 .7rem var(--mono);color:var(--ink-2);margin:1px 0 4px">${esc(x.r.o)} · ${esc(x.r.m)||'—'}</div>
@@ -811,6 +843,13 @@ function buildAlertasTela(){
   bars(document.getElementById('ev-bars'),
     EVID.itens.map(i=>({l:i.l, v:i.v, txt:(i.v*100).toFixed(0)+'% de '+fmtN(i.n), c:i.cls})),
     null, EVID.base);
+  const evLink = document.getElementById('ev-verlista');
+  if (evLink) evLink.onclick = e => {
+    e.preventDefault();
+    document.getElementById('o-status').value = '__problema__';
+    renderObras();
+    show('obras');
+  };
 
   const fill = document.getElementById('al-orgao');
   resetSelect(fill);
@@ -835,7 +874,7 @@ function renderAlertas(){
     fmtN(list.length)+' obras com sinais de alerta — os sinais em vermelho e laranja indicam risco; os verdes, pontos a favor.';
   document.getElementById('al-body').innerHTML = list.slice(alPage*AL_PER,(alPage+1)*AL_PER).map(x => `
     <tr>
-      <td style="min-width:220px">${esc(x.r.n)}
+      <td style="min-width:220px"><span style="font:500 .68rem var(--mono);color:var(--ink-2)">#${esc(x.r.id)}</span> ${esc(x.r.n)}
         <div style="font:400 .68rem var(--mono);color:var(--ink-2)">${esc(x.r.o)} · ${esc(x.r.m)||'—'}${x.r.c?' · '+esc(x.r.c):''}${x.r.p!=null?' · exec. '+Math.round(x.r.p)+'%':''}</div>
       </td>
       <td style="min-width:260px">${alChips(x.f)}</td>
@@ -850,15 +889,20 @@ function renderAlertas(){
 /* ============================================================
    TELA: PARALISAÇÕES
    ============================================================ */
+function qpEmptyMsg(){
+  return YEAR_SEL.size
+    ? 'Nenhuma obra do recorte de anos selecionado está quase pronta e parada. <a href="#" onclick="YEAR_SEL.clear();applyYearFilter();return false" style="color:var(--steel)">Limpar filtro de ano</a> pra ver todos os períodos.'
+    : 'Nenhuma obra em situação de "quase pronta e parada" no momento — bom sinal.';
+}
 let poPage = 0; const PO_PER = 25;
 let PARADAS = [];
 function buildParalisacoes(){
   PARADAS = DATA.filter(isStopped).map(r => {
     const d = parseDate(r.dp);
     return {r, dias: d ? Math.round((HOJE-d)/864e5) : null};
-  });
+  }).map(x => ({...x, diasReal: x.r.dpar > 0 ? x.r.dpar : x.dias}));
   const vPreso = PARADAS.reduce((a,x)=>a+Math.max(x.r.vt-x.r.vp,0),0);
-  const comDias = PARADAS.filter(x=>x.dias!=null).map(x=>x.dias).sort((a,b)=>a-b);
+  const comDias = PARADAS.filter(x=>x.diasReal!=null).map(x=>x.diasReal).sort((a,b)=>a-b);
   const medDias = comDias[Math.floor(comDias.length/2)] || 0;
   const quase = PARADAS.filter(x=>x.r.p!=null&&x.r.p>=80);
   const vQuase = quase.reduce((a,x)=>a+Math.max(x.r.vt-x.r.vp,0),0);
@@ -872,12 +916,13 @@ function buildParalisacoes(){
   document.getElementById('qp-body').innerHTML = [...quase]
     .sort((a,b)=>b.r.p-a.r.p).slice(0,15).map(x => `
     <tr>
+      <td class="num">${esc(x.r.id)}</td>
       <td>${esc(x.r.n)}<div style="font:400 .68rem var(--mono);color:var(--ink-2)">${esc(x.r.m)||''}${x.r.c?' · '+esc(x.r.c):''}</div></td>
       <td>${esc(x.r.o)}</td>
       <td class="num" style="color:var(--ok);font-weight:600">${Math.round(x.r.p)}%</td>
       <td class="num">${fmtBRL(Math.max(x.r.vt-x.r.vp,0))}</td>
       <td class="num">${esc(x.r.dp)||'—'}</td>
-    </tr>`).join('');
+    </tr>`).join('') || '<tr><td colspan="6" class="sub" style="padding:12px 8px">' + qpEmptyMsg() + '</td></tr>';
 
   // motivos com duração mediana
   const stops = DATA.filter(r=>r.dp);
@@ -922,20 +967,23 @@ function renderParadas(){
   let list = PARADAS.filter(x => !og || x.r.o === og);
   if (sort === 'valor') list = [...list].sort((a,b)=>b.r.vt-a.r.vt);
   else if (sort === 'exec') list = [...list].sort((a,b)=>(b.r.p||0)-(a.r.p||0));
-  else list = [...list].sort((a,b)=>(b.dias||0)-(a.dias||0));
+  else list = [...list].sort((a,b)=>(b.diasReal||0)-(a.diasReal||0));
   const pages = Math.max(1, Math.ceil(list.length/PO_PER));
   poPage = Math.min(poPage, pages-1);
   document.getElementById('po-count').textContent =
     fmtN(list.length)+' obras — inclui todas com status "Paralisado Com Termo" e as ativas com paralisação sem data de reinício';
-  document.getElementById('po-body').innerHTML = list.slice(poPage*PO_PER,(poPage+1)*PO_PER).map(x => `
+  document.getElementById('po-body').innerHTML = list.slice(poPage*PO_PER,(poPage+1)*PO_PER).map(x => {
+    const dias = x.r.dpar > 0 ? x.r.dpar : x.dias;
+    return `
     <tr>
+      <td class="num">${esc(x.r.id)}</td>
       <td>${esc(x.r.n)}<div style="font:400 .68rem var(--mono);color:var(--ink-2)">${esc(x.r.m)||''}${x.r.c?' · '+esc(x.r.c):''}</div></td>
       <td>${esc(x.r.o)}</td>
       <td class="num">${x.r.p==null?'—':Math.round(x.r.p)+'%'}</td>
-      <td class="num" style="${x.dias>730?'color:var(--risk);font-weight:600':''}">${x.dias==null?'—':x.dias>=365?tempoTxt(x.dias/365):x.dias+' dias'}</td>
+      <td class="num" style="${dias>730?'color:var(--risk);font-weight:600':''}">${dias==null?'—':dias>=365?tempoTxt(dias/365):dias+' dias'}</td>
       <td style="font-size:.74rem">${esc(motivoCat(x.r.mo))}</td>
       <td class="num">${x.r.vt?fmtBRL(x.r.vt):'—'}</td>
-    </tr>`).join('');
+    </tr>`; }).join('');
   document.getElementById('po-page').textContent = (poPage+1)+' / '+pages;
   document.getElementById('po-prev').disabled = poPage===0;
   document.getElementById('po-next').disabled = poPage>=pages-1;
@@ -979,6 +1027,8 @@ function buildEmpProb(){
           : `<b>sem obras ativas</b>histórico apenas`}
       </div>
     </div>`).join('') || '<div class="sub" style="padding:14px 0">Nenhuma empresa se encaixa no critério. 🎉</div>';
+  document.getElementById('ep-legend').innerHTML =
+    `<b>O que conta como "problema"?</b> Um contrato é contado como problema quando termina com status <span class="tag t-can">Cancelado</span>, <span class="tag t-par">Sem Evolução</span> ou <span class="tag t-par">Paralisado Com Termo</span> — nunca por atraso isolado ou por decisão de triagem manual. Clique em qualquer empresa acima pra ver a lista completa dos contratos dela, com o ID e o status de cada um.`;
 
   document.querySelectorAll('.ep').forEach(el => {
     el.addEventListener('click', () => { showContr(el.dataset.k); });
@@ -1049,7 +1099,7 @@ function oFiltered(){
   const og = document.getElementById('o-orgao').value;
   const tp = document.getElementById('o-tipo').value;
   return DATA.filter(r =>
-    (!st || r.s===st) && (!og || r.o===og) && (!tp || r.t===tp) &&
+    (!st || (st==='__problema__' ? isProblem(r) : r.s===st)) && (!og || r.o===og) && (!tp || r.t===tp) &&
     (!q || r.n.toLowerCase().includes(q) || r.m.toLowerCase().includes(q) || r.c.toLowerCase().includes(q) || r.id===q));
 }
 function renderObras(){
@@ -1068,14 +1118,14 @@ function renderObras(){
   document.getElementById('o-next').disabled = oPage>=pages-1;
 }
 function buildObrasFilters(){
-  const fill = (id, vals) => {
+  const fill = (id, vals, keep) => {
     const el = document.getElementById(id);
-    resetSelect(el);
+    resetSelect(el, keep);
     [...new Set(vals.filter(Boolean))].sort().forEach(v => {
       const o = document.createElement('option'); o.value = o.textContent = v; el.appendChild(o);
     });
   };
-  fill('o-status', DATA.map(r=>r.s));
+  fill('o-status', DATA.map(r=>r.s), 2);
   fill('o-orgao', DATA.map(r=>r.o));
   fill('o-tipo', DATA.map(r=>r.t));
 }
@@ -1129,9 +1179,17 @@ document.getElementById('po-prev').addEventListener('click', ()=>{poPage--;rende
 document.getElementById('po-next').addEventListener('click', ()=>{poPage++;renderParadas();});
 
 document.getElementById('cfg-url').value = localStorage.getItem(LS_KEY) || '';
+document.getElementById('cfg-key').value = localStorage.getItem(LS_KEY_TOKEN) || '';
 document.getElementById('cfg-save').addEventListener('click', () => {
   const v = document.getElementById('cfg-url').value.trim();
+  const k = document.getElementById('cfg-key').value.trim();
   if (v) localStorage.setItem(LS_KEY, v); else localStorage.removeItem(LS_KEY);
+  if (k) localStorage.setItem(LS_KEY_TOKEN, k); else localStorage.removeItem(LS_KEY_TOKEN);
+  location.reload();
+});
+document.getElementById('cfg-clear').addEventListener('click', () => {
+  localStorage.removeItem(LS_KEY);
+  localStorage.removeItem(LS_KEY_TOKEN);
   location.reload();
 });
 
