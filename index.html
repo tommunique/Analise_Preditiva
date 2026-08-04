@@ -133,6 +133,22 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
 .note{font-size:.75rem;color:var(--ink-2);border-left:3px solid var(--warn);padding:6px 10px;background:#FBF6EC;border-radius:0 4px 4px 0;margin-top:12px}
 .opp{border-left:3px solid var(--ok);background:#F0F7F1}
 
+/* ficha de consulta por ID */
+.cq-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:6px}
+.cq-verdict{display:inline-block;font:700 .82rem 'Barlow Semi Condensed';text-transform:uppercase;letter-spacing:.06em;padding:6px 14px;border-radius:6px;white-space:nowrap}
+.cq-verdict.crit{background:var(--risk);color:#fff}
+.cq-verdict.alto{background:var(--warn);color:#fff}
+.cq-verdict.aten{background:var(--warn-soft);color:#7A5210}
+.cq-verdict.ok{background:var(--ok-soft);color:var(--ok)}
+.cq-verdict.prob{background:var(--risk);color:#fff}
+.cq-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:0 24px;margin:14px 0}
+.cq-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:.85rem}
+.cq-row .k{color:var(--ink-2)}
+.cq-row .v{font-weight:600;text-align:right}
+.cq-sec{margin-top:20px}
+.cq-sec h3{font:700 .85rem 'Barlow Semi Condensed';text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2);margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid var(--ink)}
+.cq-empty{padding:30px 10px;text-align:center;color:var(--ink-2);font-size:.88rem}
+
 /* filtro por ano de celebração */
 #yearbar{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .yb-lbl{font:600 .74rem 'Barlow Semi Condensed';text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2);white-space:nowrap}
@@ -176,6 +192,7 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
       <button data-s="paralisacoes">Paralisações</button>
       <button data-s="contratadas">Contratadas</button>
       <button data-s="obras">Obras</button>
+      <button data-s="consulta">🔍 Consultar ID</button>
       <button data-s="config">⚙</button>
     </nav>
     <div id="src-badge"></div>
@@ -367,6 +384,19 @@ td.num{font-family:var(--mono);font-size:.76rem;text-align:right;white-space:now
         <span id="o-page"></span>
         <button id="o-next">Próxima →</button>
       </div>
+    </div>
+  </section>
+
+  <!-- ============ CONSULTA POR ID ============ -->
+  <section class="screen" id="s-consulta">
+    <div class="card">
+      <h2>🔍 Ficha de risco por obra</h2>
+      <div class="sub">Digite o ID da ação pra ver um resumo de uma página: contratada, prazo, paralisações e todos os sinais de risco identificados.</div>
+      <div class="filters">
+        <input id="cq-input" type="text" inputmode="numeric" placeholder="Digite o ID da ação (ex: 12437)" style="max-width:280px">
+        <button id="cq-btn" style="background:var(--steel);color:#fff;border:none;border-radius:var(--radius);padding:8px 18px;font:600 .85rem 'IBM Plex Sans';cursor:pointer">Buscar</button>
+      </div>
+      <div id="cq-result"></div>
     </div>
   </section>
 
@@ -1168,11 +1198,17 @@ function renderObras(){
   oPage = Math.min(oPage, pages-1);
   document.getElementById('o-count').textContent = fmtN(list.length)+' obras encontradas';
   document.getElementById('o-body').innerHTML = list.slice(oPage*PER,(oPage+1)*PER).map(r=>`<tr>
-    <td class="num">${esc(r.id)}</td>
+    <td class="num"><a href="#" class="cq-goto" data-id="${esc(r.id)}" style="color:var(--steel)">${esc(r.id)}</a></td>
     <td>${esc(r.n)}${r.c?`<div style="font:400 .68rem var(--mono);color:var(--ink-2)">${esc(r.c)}</div>`:''}</td>
     <td>${esc(r.o)}</td><td>${statusTag(r.s)}</td><td>${esc(r.m)||'—'}</td>
     <td class="num">${r.p==null?'—':Math.round(r.p)+'%'}</td>
     <td class="num">${r.vt?fmtBRL(r.vt):'—'}</td></tr>`).join('');
+  document.querySelectorAll('.cq-goto').forEach(a => a.addEventListener('click', e => {
+    e.preventDefault();
+    document.getElementById('cq-input').value = a.dataset.id;
+    show('consulta');
+    runConsultaID();
+  }));
   document.getElementById('o-page').textContent = (oPage+1)+' / '+pages;
   document.getElementById('o-prev').disabled = oPage===0;
   document.getElementById('o-next').disabled = oPage>=pages-1;
@@ -1188,6 +1224,113 @@ function buildObrasFilters(){
   fill('o-status', DATA.map(r=>r.s), 3);
   fill('o-orgao', DATA.map(r=>r.o));
   fill('o-tipo', DATA.map(r=>r.t));
+}
+
+/* ============================================================
+   CONSULTA POR ID — ficha de risco de uma obra específica
+   ============================================================ */
+function runConsultaID(){
+  const raw = document.getElementById('cq-input').value.trim();
+  const el = document.getElementById('cq-result');
+  if (!raw){ el.innerHTML = ''; return; }
+  const r = RAW.find(x => x.id === raw) || RAW.find(x => x.id === String(parseInt(raw,10)));
+  if (!r){
+    el.innerHTML = `<div class="cq-empty">Nenhuma obra com ID <b>${esc(raw)}</b> encontrada no recorte atual (só OBRA, sem convênios). Confira o número na planilha.</div>`;
+    return;
+  }
+  renderConsultaID(r);
+}
+
+function renderConsultaID(r){
+  const el = document.getElementById('cq-result');
+  const e = r.c ? empRate(r.cj || r.c) : null;
+  const dCel = parseDate(r.dc), dPrazo = parseDate(r.pz), dStop = parseDate(r.dp), dRestart = parseDate(r.dr);
+  const { f: alertas, pts, lvl } = obraAlertas(r);
+
+  // veredito no topo
+  let verdictCls, verdictTxt;
+  if (isProblem(r)){
+    verdictCls = 'prob';
+    verdictTxt = r.s === 'Cancelado' ? '🔴 PROBLEMA CONFIRMADO — CANCELADA' : '🔴 PROBLEMA CONFIRMADO — ADITIVO ALTO';
+  } else if (lvl >= 3){ verdictCls='crit'; verdictTxt='🔴 ALERTA CRÍTICO'; }
+  else if (lvl === 2){ verdictCls='alto'; verdictTxt='🟠 ALERTA ALTO'; }
+  else if (lvl === 1){ verdictCls='aten'; verdictTxt='🟡 ATENÇÃO'; }
+  else { verdictCls='ok'; verdictTxt='✓ SEM ALERTAS'; }
+
+  const diasParada = r.dpar > 0 ? r.dpar : (dStop && !dRestart ? Math.round((HOJE-dStop)/864e5) : null);
+  const atrasoDias = dPrazo ? Math.round((HOJE - dPrazo)/864e5) : null;
+
+  el.innerHTML = `
+    <div class="cq-head">
+      <div>
+        <div style="font:500 .78rem var(--mono);color:var(--ink-2)">ID #${esc(r.id)}</div>
+        <h2 style="font-size:1.25rem;margin:2px 0 4px">${esc(r.n)}</h2>
+        <div style="font-size:.85rem;color:var(--ink-2)">${esc(r.o)} · ${esc(r.m)||'—'} · ${esc(r.t)||'—'}</div>
+      </div>
+      <span class="cq-verdict ${verdictCls}">${verdictTxt}</span>
+    </div>
+
+    <div class="kpis" style="margin-top:16px">
+      <div class="kpi">${statusTag(r.s)}<span style="display:block;margin-top:6px">status atual</span></div>
+      <div class="kpi"><b>${r.p==null?'—':Math.round(r.p)+'%'}</b><span>executado</span></div>
+      <div class="kpi"><b>${r.vt?fmtBRL(r.vt):'—'}</b><span>valor total</span></div>
+      <div class="kpi"><b>${r.vp?fmtBRL(r.vp):'R$ 0'}</b><span>pago até agora</span></div>
+      <div class="kpi ${r.vt-r.vp>0?'warn':''}"><b>${fmtBRL(Math.max(r.vt-r.vp,0))}</b><span>falta pagar/executar</span></div>
+    </div>
+
+    <div class="cq-sec">
+      <h3>Dados do contrato</h3>
+      <div class="cq-grid">
+        <div>
+          <div class="cq-row"><span class="k">Classificação</span><span class="v">${esc(r.cl)||'—'}</span></div>
+          <div class="cq-row"><span class="k">Data de celebração</span><span class="v">${esc(r.dc)||'—'}${dCel?' ('+tempoTxt(anosDesde(dCel))+' atrás)':''}</span></div>
+          <div class="cq-row"><span class="k">Prazo de conclusão</span><span class="v">${esc(r.pz)||'—'}${atrasoDias!=null&&atrasoDias>0&&r.s!=='Concluído'?' <span style="color:var(--risk)">('+tempoTxt(atrasoDias/365)+' de atraso)</span>':''}</span></div>
+          <div class="cq-row"><span class="k">Valor original</span><span class="v">${r.vo?fmtBRL(r.vo):'—'}</span></div>
+        </div>
+        <div>
+          <div class="cq-row"><span class="k">Valor total (c/ aditivos)</span><span class="v">${r.vt?fmtBRL(r.vt):'—'}${hasAditivoExcess(r)?' <span style="color:var(--risk)">(+'+Math.round((r.vt/r.vo-1)*100)+'%)</span>':''}</span></div>
+          <div class="cq-row"><span class="k">% pago</span><span class="v">${r.vt?Math.round(r.vp/r.vt*100)+'%':'—'}</span></div>
+          <div class="cq-row"><span class="k">Órgão</span><span class="v">${esc(r.o)||'—'}</span></div>
+          <div class="cq-row"><span class="k">Município</span><span class="v">${esc(r.m)||'—'}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cq-sec">
+      <h3>Empresa contratada</h3>
+      ${r.c ? `
+        <div class="cq-row"><span class="k">Nome</span><span class="v">${esc(r.c)}${r.cj?' · CNPJ '+esc(r.cj):''}</span></div>
+        ${e ? `
+        <div class="cq-row"><span class="k">Histórico (contratos encerrados)</span><span class="v">${e.p} de ${e.n} deram problema (${(e.rate*100).toFixed(0)}%)</span></div>
+        ` : `<div class="cq-row"><span class="k">Histórico</span><span class="v">menos de 5 contratos encerrados — sem base suficiente</span></div>`}
+        <button id="cq-goempresa" style="margin-top:8px;background:none;border:1px solid var(--steel);color:var(--steel);border-radius:6px;padding:6px 14px;font:600 .8rem 'IBM Plex Sans';cursor:pointer">Ver todos os contratos desta empresa →</button>
+      ` : '<div class="cq-row"><span class="k">Nome</span><span class="v">Sem contratada registrada (fase de projeto/licitação)</span></div>'}
+    </div>
+
+    <div class="cq-sec">
+      <h3>Paralisação</h3>
+      <div class="cq-row"><span class="k">Já foi paralisada?</span><span class="v">${r.dp ? 'Sim' : 'Não, sem registro de paralisação'}</span></div>
+      ${r.dp ? `
+      <div class="cq-row"><span class="k">Data da última paralisação</span><span class="v">${esc(r.dp)}</span></div>
+      <div class="cq-row"><span class="k">Reiniciou?</span><span class="v">${dRestart ? 'Sim, em '+esc(r.dr) : '<span style="color:var(--risk)">Não — ainda parada</span>'}</span></div>
+      <div class="cq-row"><span class="k">Motivo registrado</span><span class="v">${esc(r.mo)||'—'} (${esc(motivoCat(r.mo))})</span></div>
+      <div class="cq-row"><span class="k">Total de dias parada (acumulado)</span><span class="v">${r.dpar>0?(r.dpar>=365?tempoTxt(r.dpar/365):r.dpar+' dias'):(diasParada?diasParada+' dias (estimado)':'—')}</span></div>
+      ` : ''}
+    </div>
+
+    <div class="cq-sec">
+      <h3>Sinais de risco identificados (${alertas.filter(a=>a.sev!=='good').length})</h3>
+      ${alertas.length
+        ? `<div style="margin-top:6px">${alChips(alertas)}</div>`
+        : '<div class="sub">Nenhum sinal de risco identificado pra essa obra no momento.</div>'}
+    </div>`;
+
+  const btn = document.getElementById('cq-goempresa');
+  if (btn) btn.addEventListener('click', () => {
+    const key = r.cj || r.c;
+    show('contratadas');
+    setTimeout(() => showContr(key, false), 0);
+  });
 }
 
 /* ============================================================
@@ -1237,6 +1380,9 @@ document.getElementById('al-next').addEventListener('click', ()=>{alPage++;rende
   document.getElementById(id).addEventListener('change', ()=>{poPage=0;renderParadas();}));
 document.getElementById('po-prev').addEventListener('click', ()=>{poPage--;renderParadas();});
 document.getElementById('po-next').addEventListener('click', ()=>{poPage++;renderParadas();});
+
+document.getElementById('cq-btn').addEventListener('click', runConsultaID);
+document.getElementById('cq-input').addEventListener('keydown', e => { if (e.key === 'Enter') runConsultaID(); });
 
 document.getElementById('cfg-url').value = localStorage.getItem(LS_KEY) || '';
 document.getElementById('cfg-key').value = localStorage.getItem(LS_KEY_TOKEN) || '';
